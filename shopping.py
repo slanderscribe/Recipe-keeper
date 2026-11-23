@@ -179,39 +179,119 @@ def display_name(key):
     return key[:1].upper() + key[1:]
 
 
+# Standard conversion table. Every unit is converted to grams (weight) or ml (volume) the same way.
+WEIGHT_TO_G = {"g": 1, "gram": 1, "grams": 1, "gr": 1, "kg": 1000, "kgs": 1000,
+               "oz": 28.35, "ounce": 28.35, "ounces": 28.35,
+               "lb": 453.6, "lbs": 453.6, "pound": 453.6, "pounds": 453.6}
+VOLUME_TO_ML = {"cup": 236.6, "cups": 236.6, "c": 236.6,
+                "tbsp": 14.8, "tbsps": 14.8, "tbs": 14.8, "tablespoon": 14.8, "tablespoons": 14.8,
+                "tsp": 4.93, "tsps": 4.93, "teaspoon": 4.93, "teaspoons": 4.93,
+                "fl oz": 29.57, "floz": 29.57,
+                "ml": 1, "l": 1000, "liter": 1000, "liters": 1000, "litre": 1000, "litres": 1000}
+STICK_WORDS = {"stick", "sticks"}
+COUNT_WORDS = {"can", "cans", "clove", "cloves", "pinch", "pinches", "dash", "package", "packages",
+               "pkg", "pkgs", "bag", "bags", "jar", "jars", "bunch", "bunches", "slice", "slices"}
+# Unit words that are only labels: removed from the ingredient name.
+LABEL_WORDS = {"grams", "gram", "g", "cups", "cup", "c", "tbsp", "tbsps", "tablespoons", "tablespoon",
+               "tsp", "tsps", "teaspoons", "teaspoon", "oz", "ounces", "ounce", "lb", "lbs", "pounds",
+               "pound", "ml", "plus", "and", "fl", "floz"}
+NUMBER = r"(\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?)"
+
+
+def unit_kind(token):
+    """Return ('weight'|'volume'|'stick'|'count', factor, label) for a unit token, or None."""
+    raw = token.rstrip(".")
+    if raw == "T":
+        return ("volume", VOLUME_TO_ML["tbsp"], "tbsp")
+    if raw == "t":
+        return ("volume", VOLUME_TO_ML["tsp"], "tsp")
+    if raw == "C":
+        return ("volume", VOLUME_TO_ML["cup"], "cup")
+    low = raw.lower()
+    if low in WEIGHT_TO_G:
+        return ("weight", WEIGHT_TO_G[low], low)
+    if low in VOLUME_TO_ML:
+        return ("volume", VOLUME_TO_ML[low], low)
+    if low in STICK_WORDS:
+        return ("stick", 1, low)
+    if low in COUNT_WORDS:
+        return ("count", 1, low)
+    return None
+
+
+def parse_value(text):
+    text = text.strip()
+    if " " in text:
+        whole, frac = text.split(" ", 1)
+        return float(int(whole) + Fraction(frac))
+    if "/" in text:
+        return float(Fraction(text))
+    return float(text)
+
+
 def parse_ingredient(line):
-    """Read one ingredient line into its amount, unit and what it is."""
+    """Read one ingredient line into what to buy: its name, its amount in grams or count, and what it says."""
     original = " ".join(line.split())
-    text = re.sub(r"\(.*?\)", " ", original)
-    value, rest = parse_quantity(text)
-    unit, rest = parse_unit(rest) if value is not None else (None, text)
-    name = normalize_name(rest)
+    text = original
+    for char, frac in FRACTION_CHARS.items():
+        text = text.replace(char, " " + frac)
+    text = re.sub(r"(\d)\s+and\s+(\d+/\d+)", r"\1 \2", text, flags=re.IGNORECASE)
+    text = re.sub(r"[()\[\]]", " ", text)
+
+    measures = []  # (value, kind, factor, label)
+    for match in re.finditer(NUMBER + r"\s*([A-Za-z]+\.?)(?=\s|$|[,.+/])", text):
+        info = unit_kind(match.group(2))
+        if info:
+            kind, factor, label = info
+            measures.append((parse_value(match.group(1)), kind, factor, label))
+    spans_text = re.sub(NUMBER + r"\s*([A-Za-z]+\.?)(?=\s|$|[,.+/])",
+                        lambda m: " " if unit_kind(m.group(2)) else m.group(0), text)
+    bare = re.match(r"^\s*" + NUMBER + r"(?=\s|$|[,.])", spans_text)
+    bare_value = parse_value(bare.group(1)) if bare else None
+    if bare:
+        spans_text = spans_text[bare.end():]
+
+    weights = [m for m in measures if m[1] == "weight"]
+    volumes = [m for m in measures if m[1] == "volume"]
+    sticks = [m for m in measures if m[1] == "stick"]
+    counts = [m for m in measures if m[1] == "count"]
+
+    name_words = [w for w in re.sub(r"[^A-Za-z\s\-\.']", " ", spans_text).replace("'", "").split()
+                  if w.lower().strip(".") not in LABEL_WORDS and w.lower().strip(".") not in COUNT_WORDS]
+    name = normalize_name(" ".join(name_words))
     key = item_key(name) if name else ""
+    spec = PACKAGES.get(key, {})
+
     grams = None
     count = None
-    if value is not None and key in PACKAGES:
-        spec = PACKAGES[key]
-        if spec.get("each"):
-            # Counted items (eggs, bananas) only convert from a plain count, never from cups or weight.
-            count = value if unit is None else None
-        elif unit is not None and unit in UNIT_MAP:
-            base, factor = UNIT_MAP[unit]
-            if base == "stick":
-                stick = spec.get("stick_g")
-                grams = value * stick if stick else None
-            elif base == "ml":
-                ml = value * factor
-                grams = ml * (spec["per_cup"] / 237) if "per_cup" in spec else ml
-            else:
-                grams = value * factor
-    amount_text = " ".join(part for part in (format_amount(value), unit or "") if part)
+    if weights:
+        grams = sum(v * f for v, _, f, _ in weights)
+    elif volumes:
+        ml = sum(v * f for v, _, f, _ in volumes)
+        if "per_cup" in spec:
+            grams = ml * spec["per_cup"] / 236.6   # standard density for this ingredient
+        elif spec and not spec.get("each"):
+            grams = ml                              # liquids: 1 ml is about 1 g
+    elif sticks and spec.get("stick_g"):
+            grams = sum(v for v, _, _, _ in sticks) * spec["stick_g"]
+    if spec.get("each"):
+        if bare_value is not None and not measures:
+            count = bare_value
+        elif bare_value is not None and not volumes and not weights:
+            count = bare_value
+        grams = None
+    amount_bits = [f"{format_amount(v)} {label}" for v, _, _, label in measures]
+    if bare_value is not None and not measures:
+        amount_bits = [format_amount(bare_value)]
+    if weights and volumes:
+        amount_bits = [b for b, m in zip(amount_bits, measures) if m[1] != "volume"] or amount_bits
     return {
         "text": original,
         "key": key or name or original.lower(),
         "name": display_name(key or name or original),
         "grams": grams,
         "count": count,
-        "amount": amount_text,
+        "amount": " + ".join(amount_bits),
     }
 
 
@@ -283,7 +363,10 @@ def combined_amounts(name, lines):
     """What the recipes call for. Same units are added together; different units are listed."""
     totals, order, loose = {}, [], []
     for line in lines:
-        value, rest = parse_quantity(line["amount"] or "")
+        if "+" in (line["amount"] or "") or not line["amount"]:
+            loose.append(line["amount"] or line["text"])
+            continue
+        value, rest = parse_quantity(line["amount"])
         if value is None:
             loose.append(line["text"])
             continue
