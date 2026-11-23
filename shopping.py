@@ -15,7 +15,7 @@ PACKAGES = {
     "sugar": {"per_cup": 200, "packs": [(907, "2 lb bag"), (1814, "4 lb bag")]},
     "brown sugar": {"per_cup": 200, "packs": [(454, "1 lb bag"), (907, "2 lb bag")]},
     "butter": {"per_cup": 227, "stick_g": 113, "packs": [(454, "1 lb (4 sticks)")]},
-    "egg": {"each": True, "packs": [(12, "dozen")]},
+    "egg": {"each": True, "each_g": 50, "packs": [(12, "dozen")]},
     "milk": {"per_cup": 240, "packs": [(946, "quart"), (1893, "half gallon")]},
     "vegetable oil": {"per_cup": 218, "packs": [(946, "32 oz bottle"), (1419, "48 oz bottle")]},
     "honey": {"per_cup": 340, "packs": [(340, "12 oz bottle"), (680, "24 oz bottle")]},
@@ -34,8 +34,8 @@ PACKAGES = {
     "buttermilk": {"packs": [(946, "quart"), (1893, "half gallon")]},
     "cream cheese": {"packs": [(227, "8 oz package"), (454, "16 oz (2 packages)")]},
     "sour cream": {"packs": [(454, "16 oz tub")]},
-    "banana": {"each": True, "packs": [(5, "bunch (about 5)")]},
-    "garlic": {"each": True, "packs": [(10, "head (about 10 cloves)")]},
+    "banana": {"each": True, "each_g": 118, "packs": [(5, "bunch (about 5)")]},
+    "garlic": {"each": True, "each_g": 3, "packs": [(10, "head (about 10 cloves)")]},
     "lemon": {"each": True, "packs": [(1, "lemon")]},
 }
 
@@ -140,17 +140,35 @@ def parse_unit(rest):
     return None, rest
 
 
+# Words that describe how an ingredient is prepared, measured or sold. They are not part of the
+# ingredient's identity, so they are dropped: "all purpose flour, spooned and leveled" -> "all purpose flour".
+PREP_WORDS = {
+    "spooned", "spoon", "leveled", "levelled", "level", "sifted", "unsifted", "packed", "firmly", "lightly",
+    "loosely", "heaping", "heaped", "scant", "generous", "softened", "melted", "room", "temperature", "cold",
+    "chilled", "frozen", "thawed", "warm", "cooled", "chopped", "minced", "diced", "cubed", "sliced",
+    "grated", "shredded", "peeled", "rinsed", "drained", "toasted", "crushed", "beaten", "whisked",
+    "divided", "optional", "fresh", "freshly", "large", "medium", "small", "extra", "jumbo", "boneless",
+    "skinless", "ripe", "mashed", "salted", "unsalted", "light", "dark", "about", "approximately",
+    "some", "more", "needed", "taste", "favorite", "good", "quality", "store", "bought", "homemade",
+    "softened", "lukewarm", "stiff", "plain", "regular", "full", "fat", "brick", "block", "amount",
+    "pinch", "handful", "sprig", "sprigs", "splash", "dash",
+}
+STOP_WORDS = {"a", "an", "the", "of", "and", "or", "with", "into", "in", "at", "from", "for", "to", "plus",
+              "such", "as", "like", "e", "g", "etc", "each", "per", "total", "or"}
+
+
 def normalize_name(text):
+    """Reduce an ingredient phrase to its identity: the thing you buy, with no measures or prep words."""
     text = re.sub(r"\(.*?\)", " ", text)
-    text = text.split(",")[0]
+    text = re.sub(r"\b(light|dark)\s*(or|/)\s*(light|dark)\b", " ", text, flags=re.IGNORECASE)
+    text = re.split(r",|\s-\s|\s(?:or|to|for|plus|such as|like|about)\s", text, maxsplit=1, flags=re.IGNORECASE)[0]
     text = re.sub(r"^\s*of\s+", "", text.strip(), flags=re.IGNORECASE)
     lowered = text.lower().replace("-", " ").replace("’", "'").replace("'", "")
-    for word in sorted(DESCRIPTORS, key=len, reverse=True):
-        lowered = re.sub(r"\b" + re.escape(word) + r"\b", " ", lowered)
-    lowered = re.sub(r"[^a-z\s\-\.]", " ", lowered)
-    words = [w for w in re.sub(r"\s+", " ", lowered).strip(" .-").split(" ") if w and w not in FILLER_WORDS]
-    if words:
-        words[-1] = singular(words[-1])
+    lowered = re.sub(r"[^a-z\s]", " ", lowered)
+    words = [w for w in lowered.split() if w not in PREP_WORDS and w not in STOP_WORDS
+             and w not in LABEL_WORDS and w not in COUNT_WORDS]
+    words = [singular(w) for w in words]
+    words = list(dict.fromkeys(words))            # "bananas banana" -> "banana"
     return " ".join(words)
 
 
@@ -289,6 +307,8 @@ def parse_ingredient(line):
             count = bare_value
         if counts and not volumes and not weights:
             count = sum(v for v, _, _, _ in counts)
+        if weights and not volumes and spec.get("each_g"):
+            count = round(sum(v * f for v, _, f, _ in weights) / spec["each_g"], 1)
         grams = None
     amount_bits = [f"{format_amount(v)} {label}" for v, _, _, label in measures]
     if bare_value is not None and not measures:
