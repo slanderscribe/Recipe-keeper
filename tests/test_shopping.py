@@ -126,6 +126,36 @@ def test_typed_unknown_item_keeps_its_text():
     assert items(conn) == [("Birthday candles", 0)]
 
 
+@pytest.mark.parametrize("line", [
+    "Crust for 1 large pie:",
+    "Filling for 1 large pie:",
+    "For the crust",
+    "Filling",
+    "Crust",
+])
+def test_sub_headings_and_outcomes_are_parts(line):
+    assert parse_ingredient(line)["part"] is True
+
+
+@pytest.mark.parametrize("line", ["1 cup flour", "2 eggs", "1/4 tsp cloves", "1 onion, finely chopped"])
+def test_real_ingredients_are_not_parts(line):
+    assert parse_ingredient(line)["part"] is False
+
+
+def test_ground_cloves_keep_their_name():
+    parsed = parse_ingredient("¼ t. cloves")
+    assert parsed["name"] == "Ground cloves"
+    assert parsed["known"] is True
+
+
+def test_part_lines_are_removed_when_rebuilding():
+    conn = make_db()
+    add_line(conn, "Crust for 1 large pie:", "Crust for 1 large pie:")
+    add_line(conn, "Flour", "2 cups flour")
+    rebuild_items(conn)
+    assert items(conn) == [("All-purpose flour", 0)]
+
+
 def test_known_name_lookup():
     assert is_known_name("Eggs")
     assert is_known_name("Confectioners sugar")

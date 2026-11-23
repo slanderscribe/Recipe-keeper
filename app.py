@@ -669,11 +669,15 @@ def add_to_shopping(recipe_id):
     if not recipe:
         abort(404)
     added = 0
+    skipped = 0
     stamp = now()
     for raw in request.form.getlist("items"):
         if not raw.strip():
             continue
         parsed = parse_ingredient(raw)
+        if parsed["part"]:
+            skipped += 1  # a sub-heading or a finished part of the recipe, not something to buy
+            continue
         item = db.execute(
             "SELECT id FROM shopping_items WHERE checked=0 AND lower(name)=lower(?)",
             (parsed["name"],)).fetchone()
@@ -696,8 +700,10 @@ def add_to_shopping(recipe_id):
         added += 1
     rebuild_items(db)
     db.commit()
-    flash(f"Added {added} item(s) to the shopping list." if added
-          else "Those items are already on the list.", "ok")
+    message = f"Added {added} item(s) to the shopping list." if added else "Those items are already on the list."
+    if skipped:
+        message += f" Skipped {skipped} sub-heading(s) or recipe part(s)."
+    flash(message, "ok")
     return redirect(url_for("view_recipe", recipe_id=recipe_id))
 
 

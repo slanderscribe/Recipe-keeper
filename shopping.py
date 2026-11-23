@@ -197,7 +197,7 @@ def normalize_name(text):
     lowered = text.lower().replace("-", " ").replace("’", "'").replace("'", "")
     lowered = re.sub(r"[^a-z\s]", " ", lowered)
     words = [w for w in trim_modifiers(lowered.split()) if w not in PREP_WORDS and w not in STOP_WORDS
-             and w not in LABEL_WORDS and w not in COUNT_WORDS]
+             and w not in LABEL_WORDS and (w not in COUNT_WORDS or w in {"clove", "cloves"})]
     words = [singular(w) for w in words]
     words = list(dict.fromkeys(words))            # "bananas banana" -> "banana"
     return " ".join(words)
@@ -328,8 +328,12 @@ def parse_ingredient(line):
     sticks = [m for m in measures if m[1] == "stick"]
     counts = [m for m in measures if m[1] == "count"]
 
+    # "1/4 tsp cloves" is the spice, not a count of garlic cloves, so the word stays when a volume is given.
+    keep_cloves = bool(volumes) and not weights
     name_words = [w for w in re.sub(r"[^A-Za-z\s\-\.']", " ", spans_text).replace("'", "").split()
-                  if w.lower().strip(".") not in LABEL_WORDS and w.lower().strip(".") not in COUNT_WORDS]
+                  if w.lower().strip(".") not in LABEL_WORDS
+                  and (w.lower().strip(".") not in COUNT_WORDS
+                       or (keep_cloves and w.lower().strip(".") in {"clove", "cloves"}))]
     name = normalize_name(" ".join(name_words))
     key = item_key(name) if name else ""
     spec = PACKAGES.get(key, {})
@@ -369,6 +373,7 @@ def parse_ingredient(line):
         "count": count,
         "amount": " + ".join(amount_bits),
         "known": is_known_key(key),
+        "part": is_part_line(original, key, bool(measures) or bare_value is not None),
     }
 
 
@@ -507,6 +512,7 @@ VARIANT_ALIASES = {
     "bow tie pasta": "bow tie pasta", "farfalle": "bow tie pasta", "angel hair pasta": "angel hair pasta",
     "angel hair": "angel hair pasta", "lasagna noodle": "lasagna noodle", "egg noodle": "egg noodle",
     "unsalted butter": "unsalted butter", "salted butter": "salted butter",
+    "clove": "ground cloves", "ground clove": "ground cloves", "ground cloves": "ground cloves",
 }
 _FLOUR_SPEC = PACKAGES["flour"]
 _BUTTER_SPEC = PACKAGES["butter"]
@@ -519,9 +525,27 @@ for _name in VARIANT_ALIASES.values():
         PACKAGES[_name] = _BUTTER_SPEC
     elif _name.endswith("yeast"):
         PACKAGES[_name] = _YEAST_SPEC
+    elif _name.endswith("cloves"):
+        PACKAGES[_name] = {"packs": [(45, "1.5 oz jar")]}
     else:
         PACKAGES[_name] = _PASTA_SPEC
 KNOWN_INGREDIENTS |= set(VARIANT_ALIASES.values())
+KNOWN_INGREDIENTS.add("shortening")
+
+# Outcomes of a recipe, not things you buy. A line naming one of these is a part of the recipe
+# (for example "Crust for 1 large pie:" as a sub-heading) and is never added to the list.
+NOT_INGREDIENTS = {"crust", "filling", "topping", "frosting", "batter", "dough", "glaze", "marinade",
+                   "garnish", "assembly", "streusel"}
+
+
+def is_part_line(original, key, has_amount):
+    """True for sub-headings and outcomes: 'Crust for 1 large pie:', 'Filling', 'For the crust'."""
+    if key in NOT_INGREDIENTS:
+        return True
+    text = original.strip()
+    if text.endswith(":"):
+        return True
+    return not has_amount and re.search(r"\bfor\s+(\d|the|a|an|one)\b", text, re.IGNORECASE) is not None
 KNOWN_INGREDIENTS -= {"pasta", "noodle", "yeast", "flour"}
 
 
@@ -551,6 +575,10 @@ def rebuild_items(conn):
         if its_lines:
             for line in its_lines:
                 parsed = parse_ingredient(line["text"])
+                if parsed["part"]:
+                    # A sub-heading or an outcome saved by an older version: it is not bought.
+                    conn.execute("DELETE FROM shopping_lines WHERE id=?", (line["id"],))
+                    continue
                 units.append((it["checked"], parsed["key"], parsed["name"], it["id"], line["id"], parsed))
         else:
             parsed = parse_ingredient(it["name"])
