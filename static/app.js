@@ -168,21 +168,25 @@
 
     function render(list2) {
       const typed = input.value.trim();
-      const options = [];
-      if (typed && !has(typed)) options.push({ label: "Add “" + typed + "”", value: typed });
+      const lower = function (s) { return s.toLowerCase(); };
+      const matches = [];
       list2.forEach(function (s) {
-        if (!has(s) && !options.some(function (o) { return o.value.toLowerCase() === s.toLowerCase(); })) {
-          options.push({ label: s, value: s });
-        }
+        if (!has(s) && !matches.some(function (m) { return lower(m) === lower(s); })) matches.push(s);
       });
+      const options = matches.map(function (s) { return { label: s, value: s }; });
+      if (typed && !has(typed) && !matches.some(function (m) { return lower(m) === lower(typed); })) {
+        options.push({ label: "Add “" + typed + "”", value: typed, add: true });
+      }
       box.innerHTML = "";
       items = options.slice(0, 8);
-      active = -1;
+      // The best match is highlighted, so Tab or Enter fills it in as you type.
+      active = items.length && !items[0].add ? 0 : -1;
       if (!items.length) return hide();
       items.forEach(function (item, i) {
         const li = document.createElement("li");
         li.textContent = item.label;
         li.setAttribute("role", "option");
+        li.classList.toggle("is-active", i === active);
         li.addEventListener("mousedown", function (e) { e.preventDefault(); choose(i); });
         box.appendChild(li);
       });
@@ -219,6 +223,9 @@
         active = (active + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
         Array.from(box.children).forEach(function (li, i) { li.classList.toggle("is-active", i === active); });
         e.preventDefault();
+      } else if (e.key === "Tab" && !box.hidden && items.length) {
+        e.preventDefault();
+        choose(active >= 0 ? active : 0);
       } else if (e.key === "Escape") {
         hide();
       }

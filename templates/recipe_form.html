@@ -40,7 +40,7 @@
                  placeholder="Add a category, e.g. Holiday" aria-label="Add a category">
           <ul class="suggest" role="listbox" hidden></ul>
         </div>
-        <p class="muted small">The first one or two are sorted automatically. Add your own, like “Holiday.” Press Enter or comma to attach each one.</p>
+        <p class="muted small">The first one or two are sorted automatically. Add your own, like “Holiday.” Tab or Enter picks the highlighted match; comma also attaches what you typed.</p>
       </div>
       <label>Tags (comma separated)
         <input type="text" name="tags" value="{{ (recipe.tags or '').replace(',', ', ') }}" placeholder="dinner, quick, kid-approved">

@@ -26,6 +26,10 @@ IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
 VIDEO_EXTS = {"mp4", "mov", "webm", "m4v"}
 DEFAULT_CATEGORIES = ["Breakfast", "Lunch", "Dinner", "Dessert", "Baking", "Snacks",
                       "Appetizers", "Soups & Salads", "Sides", "Drinks"]
+# Common custom groupings offered as suggestions (they only attach to a recipe once you pick them).
+SUGGESTED_CATEGORIES = ["Holiday", "Christmas", "Thanksgiving", "Easter", "Birthday", "Party",
+                        "Game day", "Date night", "Weeknight", "Meal prep", "Kid-approved",
+                        "Vegetarian", "Gluten-free", "Summer", "Winter"]
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or hashlib.sha256(
@@ -374,11 +378,13 @@ def suggest():
     if request.args.get("kind") == "category":
         # Category boxes on the recipe form: only category names, alphabetical.
         names = all_category_names()
+        for event in SUGGESTED_CATEGORIES:
+            names.setdefault(event.lower(), event)
         matches = [name for name in names.values()
                    if name.lower().startswith(q) or any(w.startswith(q) for w in name.lower().split())]
         return jsonify(sorted(matches, key=str.lower)[:8])
     pool = {}
-    for name in DEFAULT_CATEGORIES:
+    for name in DEFAULT_CATEGORIES + SUGGESTED_CATEGORIES:
         pool.setdefault(name.lower(), name)
     for row in db.execute("SELECT category, tags, title, source_author FROM recipes").fetchall():
         candidates = [row["category"], row["title"], row["source_author"]]

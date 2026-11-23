@@ -132,7 +132,8 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
 .flash.warn { background: #fff4cf; border-color: #ebd78a; }
 
 /* hero and search */
-.hero { padding: 1rem 0 1.25rem; }
+/* keep dropdowns above the category tabs and the fields below them */
+.hero { position: relative; z-index: 40; padding: 1rem 0 1.25rem; }
 .eyebrow {
   margin: 0 0 .3rem; font-size: .78rem; text-transform: uppercase;
   letter-spacing: .16em; color: var(--tomato-deep); font-weight: 700;
@@ -314,7 +315,7 @@ input[type="file"] { font-weight: 400; }
 .suggest-wrap { display: block; position: relative; }
 
 /* category chips: each category is a boxed, removable item */
-.field { margin-bottom: 1rem; }
+.field { position: relative; z-index: 20; margin-bottom: 1rem; }
 .field-label { display: block; font-weight: 600; margin-bottom: .3rem; }
 .tokens {
   position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
