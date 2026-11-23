@@ -274,6 +274,7 @@ def parse_page(page_html, url):
         draft["ingredients"] = "\n".join(c for c in (clean_text(i) for i in ingredients) if c)
         draft["steps"] = "\n".join(flatten_steps(recipe.get("recipeInstructions")))
         draft["source_author"] = text_of(recipe.get("author"))
+        draft["category"] = text_of(recipe.get("recipeCategory"))
         image = first_image(recipe.get("image"))
         draft["cover_image"] = urljoin(url, image) if image else ""
 

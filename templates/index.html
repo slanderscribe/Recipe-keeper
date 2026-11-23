@@ -1,25 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="hero reveal" style="--i: 0">
-  <p class="eyebrow">Our family cookbook</p>
+  <p class="eyebrow">Our family cookbook · {{ total }} recipe{{ '' if total == 1 else 's' }}</p>
   <h1>What are we <em>cooking</em> today?</h1>
-  <form method="get" action="{{ url_for('index') }}" class="search">
-    <input type="search" name="q" value="{{ q }}" placeholder="Search recipes, ingredients or creators">
-    {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
-    <button class="btn">Search</button>
+  <form method="get" action="{{ url_for('index') }}" class="search-wrap" autocomplete="off">
+    <div class="search">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search recipes, categories or ingredients"
+             data-suggest="{{ url_for('suggest') }}" data-box="suggest-box" aria-label="Search recipes">
+      {% if cat %}<input type="hidden" name="cat" value="{{ cat }}">{% endif %}
+      {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+      <button class="btn">Search</button>
+    </div>
+    <ul class="suggest" id="suggest-box" role="listbox" hidden></ul>
   </form>
-  {% if all_tags %}
-  <div class="chips">
-    <a class="chip {{ 'active' if not tag }}" href="{{ url_for('index', q=q) }}">All</a>
-    {% for t in all_tags %}
-      <a class="chip {{ 'active' if t == tag }}" href="{{ url_for('index', tag=t, q=q) }}">#{{ t }}</a>
-    {% endfor %}
-  </div>
-  {% endif %}
 </section>
 
+<nav class="tabs cat-tabs reveal" style="--i: 1" aria-label="Categories">
+  <span class="tab-indicator" aria-hidden="true"></span>
+  <a class="tab {{ 'is-active' if not cat }}" href="{{ url_for('index', q=q, tag=tag) }}">All <span class="count">{{ total }}</span></a>
+  {% for c in categories %}
+    <a class="tab {{ 'is-active' if cat == c.name }} {{ 'empty-cat' if not c.n }}"
+       href="{{ url_for('index', cat=c.name, q=q, tag=tag) }}">{{ c.name }} <span class="count">{{ c.n }}</span></a>
+  {% endfor %}
+</nav>
+
+{% if all_tags and not cat %}
+<div class="tag-row reveal" style="--i: 2">
+  {% for t in all_tags[:14] %}
+    <a class="chip {{ 'active' if t == tag }}" href="{{ url_for('index', tag=t, q=q) }}">#{{ t }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if recipes %}
-<div class="grid">
+<div class="grid" style="margin-top: 1.25rem">
   {% for r in recipes %}
   <a class="card recipe-card reveal" style="--i: {{ loop.index0 }}" href="{{ url_for('view_recipe', recipe_id=r.id) }}">
     {% set cov = cover_url(r.cover_image) %}
@@ -31,9 +45,10 @@
       {% endif %}
     </div>
     <div class="body">
+      {% if r.category %}<span class="pill">{{ r.category }}</span>{% endif %}
       <h3>{{ r.title }}</h3>
       <p class="meta">
-        {% if r.source_platform and r.source_platform != 'web' %}<span class="pill">{{ r.source_platform }}</span>{% endif %}
+        {% if r.source_platform and r.source_platform != 'web' %}<span class="pill soft">{{ r.source_platform }}</span>{% endif %}
         {% if r.source_author %}<span>{{ r.source_author }}</span>{% endif %}
         {% if r.rating %}<span class="stars">{{ '★' * r.rating }}</span>{% endif %}
       </p>
@@ -45,8 +60,8 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="card empty reveal" style="--i: 0">
-  <h2>{{ 'Nothing matches that.' if q or tag else 'Your recipe box is empty.' }}</h2>
+<div class="card empty reveal" style="--i: 0; margin-top: 1.25rem">
+  <h2>{{ 'Nothing in this category yet.' if cat else ('Nothing matches that.' if q or tag else 'Your recipe box is empty.') }}</h2>
   <p class="muted">Paste a link from Instagram, TikTok, YouTube or a recipe site, or type one in by hand.</p>
   <a class="btn" href="{{ url_for('new_recipe') }}">Add a recipe</a>
 </div>

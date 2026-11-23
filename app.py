@@ -4,13 +4,14 @@ import hmac
 import io
 import json
 import os
+import re
 import sqlite3
 import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
 
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
-                   send_file, send_from_directory, session, url_for)
+                   send_file, send_from_directory, session, url_for, jsonify)
 
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
@@ -23,6 +24,8 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "300"))
 IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
 VIDEO_EXTS = {"mp4", "mov", "webm", "m4v"}
+DEFAULT_CATEGORIES = ["Breakfast", "Lunch", "Dinner", "Dessert", "Baking", "Snacks",
+                      "Appetizers", "Soups & Salads", "Sides", "Drinks"]
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or hashlib.sha256(
@@ -50,6 +53,7 @@ CREATE TABLE IF NOT EXISTS recipes (
     source_author TEXT NOT NULL DEFAULT '',
     source_platform TEXT NOT NULL DEFAULT '',
     cover_image TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -73,10 +77,10 @@ CREATE TABLE IF NOT EXISTS shopping_items (
 INSERT_SQL = """
 INSERT INTO recipes (title, description, servings, prep_minutes, cook_minutes, ingredients,
     steps, notes, tags, rating, source_url, source_author, source_platform, cover_image,
-    created_at, updated_at)
+    category, created_at, updated_at)
 VALUES (:title, :description, :servings, :prep_minutes, :cook_minutes, :ingredients,
     :steps, :notes, :tags, :rating, :source_url, :source_author, :source_platform,
-    :cover_image, :created_at, :updated_at)
+    :cover_image, :category, :created_at, :updated_at)
 """
 
 UPDATE_SQL = """
@@ -84,7 +88,7 @@ UPDATE recipes SET title=:title, description=:description, servings=:servings,
     prep_minutes=:prep_minutes, cook_minutes=:cook_minutes, ingredients=:ingredients,
     steps=:steps, notes=:notes, tags=:tags, rating=:rating, source_url=:source_url,
     source_author=:source_author, source_platform=:source_platform,
-    cover_image=:cover_image, updated_at=:updated_at
+    cover_image=:cover_image, category=:category, updated_at=:updated_at
 WHERE id=:id
 """
 
@@ -94,6 +98,10 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.executescript(SCHEMA)
+        # Older databases (created before categories existed) get the new column added.
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(recipes)")}
+        if "category" not in columns:
+            conn.execute("ALTER TABLE recipes ADD COLUMN category TEXT NOT NULL DEFAULT ''")
         conn.commit()
     finally:
         conn.close()
@@ -151,7 +159,11 @@ def cover_url(value):
 def template_helpers():
     count = get_db().execute(
         "SELECT COUNT(*) FROM shopping_items WHERE checked = 0").fetchone()[0]
+    names = {c.lower(): c for c in DEFAULT_CATEGORIES}
+    for row in get_db().execute("SELECT DISTINCT category FROM recipes WHERE category != ''"):
+        names.setdefault(row[0].lower(), row[0])
     return {
+        "category_options": sorted(names.values()),
         "shopping_count": count,
         "logged_in": bool(APP_PASSWORD),
         "embed_src": embed_src,
@@ -159,6 +171,13 @@ def template_helpers():
         "cover_url": cover_url,
         "max_mb": MAX_UPLOAD_MB,
     }
+
+
+def canonical_category(raw):
+    """Match a typed category to a default name regardless of case ("dessert" -> "Dessert")."""
+    name = " ".join((raw or "").split())
+    known = {c.lower(): c for c in DEFAULT_CATEGORIES}
+    return known.get(name.lower(), name[:40])
 
 
 def recipe_from_form(form):
@@ -180,6 +199,7 @@ def recipe_from_form(form):
         "source_author": form.get("source_author", "").strip(),
         "source_platform": detect_platform(source_url) if source_url else "",
         "cover_image": form.get("cover_image", "").strip(),
+        "category": canonical_category(form.get("category", "")),
     }
 
 
@@ -283,25 +303,87 @@ def too_large(_err):
 
 # ---------- recipes ----------
 
+UNCATEGORIZED = "Uncategorized"
+
+
 @app.route("/")
 def index():
     q = request.args.get("q", "").strip()
     tag = request.args.get("tag", "").strip().lower()
+    cat = request.args.get("cat", "").strip()
     db = get_db()
+
+    # Category tabs: every default category, any custom ones in use, and recipes with none.
+    all_rows = db.execute("SELECT category, tags FROM recipes").fetchall()
+    display, counts, uncategorized, tag_set = {}, {}, 0, set()
+    for row in all_rows:
+        tag_set.update(t for t in row["tags"].split(",") if t)
+        name = row["category"].strip()
+        if not name:
+            uncategorized += 1
+            continue
+        key = name.lower()
+        display.setdefault(key, name)
+        counts[key] = counts.get(key, 0) + 1
+    defaults = {c.lower(): c for c in DEFAULT_CATEGORIES}
+    for key, name in defaults.items():
+        display.setdefault(key, name)
+    custom_keys = sorted(k for k in counts if k not in defaults)
+    categories = [{"name": display[k], "n": counts.get(k, 0)} for k in list(defaults) + custom_keys]
+    if uncategorized:
+        categories.append({"name": UNCATEGORIZED, "n": uncategorized})
+
     sql = "SELECT * FROM recipes WHERE 1=1"
     params = []
     if q:
         sql += (" AND (title LIKE ? OR description LIKE ? OR ingredients LIKE ?"
-                " OR tags LIKE ? OR source_author LIKE ?)")
-        params += [f"%{q}%"] * 5
+                " OR tags LIKE ? OR source_author LIKE ? OR category LIKE ?)")
+        params += [f"%{q}%"] * 6
+    if cat == UNCATEGORIZED:
+        sql += " AND TRIM(category) = ''"
+    elif cat:
+        sql += " AND lower(category) = lower(?)"
+        params.append(cat)
     if tag:
         sql += " AND (',' || tags || ',') LIKE ?"
         params.append(f"%,{tag},%")
     sql += " ORDER BY updated_at DESC"
     recipes = db.execute(sql, params).fetchall()
-    all_tags = sorted({t for row in db.execute("SELECT tags FROM recipes").fetchall()
-                       for t in row["tags"].split(",") if t})
-    return render_template("index.html", recipes=recipes, q=q, tag=tag, all_tags=all_tags)
+    return render_template("index.html", recipes=recipes, q=q, tag=tag, cat=cat,
+                           categories=categories, total=len(all_rows), all_tags=sorted(tag_set))
+
+
+@app.route("/suggest")
+def suggest():
+    """Live suggestions while typing in the search box: categories, tags, titles and authors."""
+    q = request.args.get("q", "").strip().lower()
+    if not q:
+        return jsonify([])
+    db = get_db()
+    pool = {}
+    for name in DEFAULT_CATEGORIES:
+        pool.setdefault(name.lower(), name)
+    for row in db.execute("SELECT category, tags, title, source_author FROM recipes").fetchall():
+        candidates = [row["category"], row["title"], row["source_author"]]
+        candidates += [t.replace("-", " ") for t in row["tags"].split(",") if t]
+        for value in candidates:
+            value = (value or "").strip()
+            if value:
+                pool.setdefault(value.lower(), value)
+    scored = []
+    for low, shown in pool.items():
+        words = [w for w in re.split(r"[\s\-,&/]+", low) if w]
+        if low.startswith(q):
+            score = 0
+        elif any(w.startswith(q) for w in words):
+            score = 1
+        elif q in low:
+            score = 2
+        else:
+            continue
+        scored.append((score, low, shown))
+    scored.sort()
+    return jsonify([shown for _score, _low, shown in scored[:8]])
 
 
 @app.route("/recipes/new", methods=["GET", "POST"])
