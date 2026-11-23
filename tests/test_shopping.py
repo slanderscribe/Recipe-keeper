@@ -11,8 +11,18 @@ from shopping import is_known_name, parse_ingredient, rebuild_items  # noqa: E40
 
 # (recipe line, expected item name, expected to be recognised)
 NAME_CASES = [
-    ("2 cups all purpose flour, spooned and leveled", "Flour", True),
-    ("1 cup unsalted butter, softened to room temperature", "Butter", True),
+    ("2 cups all purpose flour, spooned and leveled", "All-purpose flour", True),
+    ("2 cups all-purpose flour", "All-purpose flour", True),
+    ("3 cups bread flour, sifted", "Bread flour", True),
+    ("2 cups flour", "All-purpose flour", True),
+    ("1 cup unsalted butter, softened to room temperature", "Unsalted butter", True),
+    ("1 cup salted butter", "Salted butter", True),
+    ("1 pkg (0.25 oz) active dry yeast", "Active dry yeast", True),
+    ("2 1/4 tsp instant yeast", "Instant yeast", True),
+    ("2 1/4 tsp yeast", "Yeast", False),
+    ("1 lb spaghetti", "Spaghetti", True),
+    ("1 lb penne, cooked and drained", "Penne", True),
+    ("8 oz pasta", "Pasta", False),
     ("1 cup light or dark brown sugar, packed", "Brown sugar", True),
     ("1 cup brown sugar tightly packed", "Brown sugar", True),
     ("2 tbsp confectioners sugar if needed", "Confectioners sugar", True),
@@ -22,7 +32,7 @@ NAME_CASES = [
     ("2 egg yolks", "Eggs", True),
     ("3 bananas, mashed", "Banana", True),
     ("1 tsp vanilla extract for serving", "Vanilla extract", True),
-    ("2 cups flour for dusting", "Flour", True),
+    ("2 cups flour for dusting", "All-purpose flour", True),
     ("1 cup cream cheese, softened", "Cream cheese", True),
     ("1 onion, finely chopped", "Onion", True),
     ("1 cup dried cranberries", "Dried cranberry", False),
@@ -77,11 +87,19 @@ def test_saved_item_with_old_name_is_renamed():
 def test_same_ingredient_from_two_recipes_merges():
     conn = make_db()
     add_line(conn, "Flour", "2 cups all purpose flour, spooned and leveled")
-    add_line(conn, "All purpose flour", "1 cup flour for dusting")
+    add_line(conn, "All-purpose flour", "1 cup flour for dusting")
     rebuild_items(conn)
-    assert items(conn) == [("Flour", 0)]
+    assert items(conn) == [("All-purpose flour", 0)]
     lines = conn.execute("SELECT count(*) FROM shopping_lines").fetchone()[0]
     assert lines == 2
+
+
+def test_different_flour_types_stay_separate():
+    conn = make_db()
+    add_line(conn, "Flour", "2 cups all purpose flour")
+    add_line(conn, "Bread flour", "3 cups bread flour")
+    rebuild_items(conn)
+    assert sorted(items(conn)) == [("All-purpose flour", 0), ("Bread flour", 0)]
 
 
 def test_eggs_from_recipe_and_yolk_roll_up():
@@ -98,7 +116,7 @@ def test_ticked_and_unticked_stay_separate():
     done = add_line(conn, "Flour", "1 cup flour")
     conn.execute("UPDATE shopping_items SET checked=1 WHERE id=?", (done,))
     rebuild_items(conn)
-    assert sorted(items(conn)) == [("Flour", 0), ("Flour", 1)]
+    assert sorted(items(conn)) == [("All-purpose flour", 0), ("All-purpose flour", 1)]
 
 
 def test_typed_unknown_item_keeps_its_text():

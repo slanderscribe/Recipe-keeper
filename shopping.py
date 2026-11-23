@@ -148,7 +148,7 @@ PREP_WORDS = {
     "chilled", "frozen", "thawed", "warm", "cooled", "chopped", "minced", "diced", "cubed", "sliced",
     "grated", "shredded", "peeled", "rinsed", "drained", "toasted", "crushed", "beaten", "whisked",
     "divided", "optional", "fresh", "freshly", "large", "medium", "small", "extra", "jumbo", "boneless",
-    "skinless", "ripe", "mashed", "salted", "unsalted", "light", "dark", "about", "approximately",
+    "skinless", "ripe", "mashed", "light", "dark", "about", "approximately",
     "some", "more", "needed", "taste", "favorite", "good", "quality", "store", "bought", "homemade",
     "softened", "lukewarm", "stiff", "plain", "regular", "full", "fat", "brick", "block", "amount",
     "pinch", "handful", "sprig", "sprigs", "splash", "dash",
@@ -163,7 +163,7 @@ MODIFIER_STARTERS = {
     "about", "such", "like", "per", "each", "etc", "room", "temperature", "cold", "warm", "softened",
     "melted", "chilled", "frozen", "thawed", "sifted", "chopped", "minced", "diced", "sliced", "beaten",
     "packed", "spooned", "leveled", "levelled", "drained", "rinsed", "peeled", "grated", "shredded",
-    "mashed", "toasted", "crushed", "whisked", "cubed", "cooked", "uncooked", "dried", "dry",
+    "mashed", "toasted", "crushed", "whisked", "cubed", "cooked", "uncooked", "dried",
 }
 # Ending-based modifiers ("tightly", "lightly", "finely", "dried") that are not ingredient names.
 ED_WORDS_THAT_ARE_NAMES = {"bread", "hundred"}
@@ -227,7 +227,16 @@ PART_OF = {
 }
 
 
+def normalize_variant(name):
+    """Lower case, hyphens and extra spaces removed, so 'All-purpose flour' and 'all purpose flour' match."""
+    return " ".join(re.sub(r"[-']", " ", (name or "").lower()).split())
+
+
 def item_key(name):
+    # A named type (bread flour, active dry yeast, penne) is its own item. Checked first.
+    variant = VARIANT_ALIASES.get(normalize_variant(name))
+    if variant:
+        return variant
     for pattern, key in SYNONYMS:
         if re.match(pattern, name):
             return PART_OF.get(key, key)
@@ -482,6 +491,40 @@ KNOWN_INGREDIENTS = set(PACKAGES) | {
     "chicken", "chicken breast", "chicken thigh", "ground beef", "beef", "pork", "bacon", "ham",
     "sausage", "salmon", "shrimp", "tuna", "tofu",
 }
+# Ingredients that come in types. The recipe must name the type, or the line is checked: a bare
+# "yeast" or "pasta" cannot be bought correctly. A bare "flour" means all-purpose, the usual meaning.
+VARIANT_ALIASES = {
+    "flour": "all-purpose flour", "all purpose flour": "all-purpose flour", "ap flour": "all-purpose flour",
+    "plain flour": "all-purpose flour", "white flour": "all-purpose flour",
+    "bread flour": "bread flour", "cake flour": "cake flour", "pastry flour": "pastry flour",
+    "self rising flour": "self-rising flour", "whole wheat flour": "whole wheat flour",
+    "white whole wheat flour": "whole wheat flour", "almond flour": "almond flour", "rye flour": "rye flour",
+    "active dry yeast": "active dry yeast", "dry active yeast": "active dry yeast",
+    "instant yeast": "instant yeast", "rapid rise yeast": "instant yeast",
+    "spaghetti": "spaghetti", "penne": "penne", "rotini": "rotini", "fusilli": "fusilli",
+    "elbow macaroni": "elbow macaroni", "macaroni": "elbow macaroni", "fettuccine": "fettuccine",
+    "linguine": "linguine", "rigatoni": "rigatoni", "ziti": "ziti", "orzo": "orzo",
+    "bow tie pasta": "bow tie pasta", "farfalle": "bow tie pasta", "angel hair pasta": "angel hair pasta",
+    "angel hair": "angel hair pasta", "lasagna noodle": "lasagna noodle", "egg noodle": "egg noodle",
+    "unsalted butter": "unsalted butter", "salted butter": "salted butter",
+}
+_FLOUR_SPEC = PACKAGES["flour"]
+_BUTTER_SPEC = PACKAGES["butter"]
+_YEAST_SPEC = {"packs": [(7, "0.25 oz packet"), (113, "4 oz jar")]}
+_PASTA_SPEC = {"packs": [(454, "1 lb box")]}
+for _name in VARIANT_ALIASES.values():
+    if _name.endswith("flour"):
+        PACKAGES[_name] = _FLOUR_SPEC
+    elif _name.endswith("butter"):
+        PACKAGES[_name] = _BUTTER_SPEC
+    elif _name.endswith("yeast"):
+        PACKAGES[_name] = _YEAST_SPEC
+    else:
+        PACKAGES[_name] = _PASTA_SPEC
+KNOWN_INGREDIENTS |= set(VARIANT_ALIASES.values())
+KNOWN_INGREDIENTS -= {"pasta", "noodle", "yeast", "flour"}
+
+
 def is_known_key(key):
     return bool(key) and key in KNOWN_INGREDIENTS
 
