@@ -7,9 +7,9 @@
   <p class="lede">Photograph a handwritten card or a cookbook page. The text is read into a new recipe, and the photo becomes its picture until you replace it with one of the finished dish.</p>
 </section>
 
-{% if not tesseract_ok %}
+{% if not ready %}
 <div class="card reveal" style="--i: 1">
-  <p>The text reader isn't installed on this server yet. Redeploy after the Dockerfile is in place.</p>
+  <p>No reader is set up yet. Add ANTHROPIC_API_KEY to the server's variables, then redeploy.</p>
 </div>
 {% else %}
 <form method="post" action="{{ url_for('capture') }}" enctype="multipart/form-data" class="card reveal capture-form" style="--i: 1">
@@ -19,7 +19,7 @@
     <span class="help">Pick one photo for a handwritten card, or several pages from a cookbook, in reading order. Up to {{ max_pages }} at a time.</span>
   </label>
   <button class="btn">Read recipe</button>
-  <p class="help">Reading takes a few seconds per page. Handwriting is read on a best-effort basis, so you'll check the result before it's saved.</p>
+  <p class="help">{% if using_claude %}Reading takes about 10 to 30 seconds for a few pages. Check the text against the scan before you save.{% else %}Reading uses the free text reader, which is weak on handwriting. Check the text against the scan before you save.{% endif %}</p>
 </form>
 {% endif %}
 {% endblock %}

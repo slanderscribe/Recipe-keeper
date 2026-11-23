@@ -13,8 +13,7 @@ from datetime import datetime, timedelta, timezone
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
-from capture import (MAX_CAPTURE_PAGES, ocr_image, parse_recipe_text,
-                     tesseract_available)
+from capture import MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
 
@@ -476,7 +475,7 @@ def import_link():
 def capture():
     """Scan handwritten recipes or cookbook pages into a draft recipe."""
     if request.method == "GET":
-        return render_template("capture.html", tesseract_ok=tesseract_available(),
+        return render_template("capture.html", ready=capture_ready(), using_claude=bool(claude_key()),
                                max_pages=MAX_CAPTURE_PAGES)
     pages = [f for f in request.files.getlist("pages") if f and f.filename]
     if not pages:
@@ -489,14 +488,12 @@ def capture():
     if not saved:
         return redirect(url_for("capture"))
     try:
-        text = "\n".join(ocr_image(os.path.join(UPLOAD_DIR, name)) for name in saved)
+        draft = read_recipe([os.path.join(UPLOAD_DIR, name) for name in saved])
     except RuntimeError as exc:
         for name in saved:
             remove_upload(name)
         flash(str(exc), "error")
         return redirect(url_for("capture"))
-
-    draft = parse_recipe_text(text)
     data = recipe_from_form({"title": draft["title"], "ingredients": draft["ingredients"],
                              "steps": draft["steps"], "notes": draft["notes"]})
     stamp = now()
