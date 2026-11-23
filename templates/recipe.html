@@ -50,7 +50,13 @@
   </section>
   {% endif %}
 
-  <div class="two-col">
+  <div class="size-ctl" role="group" aria-label="Text size">
+    <span>Text size</span>
+    <button type="button" data-size="-1" aria-label="Smaller text">A−</button>
+    <button type="button" data-size="1" aria-label="Larger text">A+</button>
+  </div>
+
+  <div class="two-col reader">
     <section class="card reveal" style="--i: 2">
       <h2>Ingredients</h2>
       {% if ingredients %}
@@ -71,7 +77,15 @@
       <h2>Steps</h2>
       {% if steps %}
       <ol class="steps">
-        {% for s in steps %}<li>{{ s }}</li>{% endfor %}
+        {% for s in steps %}
+        <li>
+          <label class="step">
+            <input type="checkbox" class="step-done" data-key="{{ r.id }}-{{ loop.index0 }}">
+            <span class="step-num">{{ loop.index }}.</span>
+            <span class="step-text">{{ s }}</span>
+          </label>
+        </li>
+        {% endfor %}
       </ol>
       {% else %}
       <p class="muted">No steps yet.</p>

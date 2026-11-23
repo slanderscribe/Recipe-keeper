@@ -1,5 +1,4 @@
 // Sliding highlight for every tab bar (top menu and category tabs).
-// It follows the pointer and keyboard focus, then settles on the current tab.
 (function () {
   document.querySelectorAll(".tabs").forEach(function (nav) {
     const indicator = nav.querySelector(".tab-indicator");
@@ -26,7 +25,8 @@
   });
 })();
 
-// Search suggestions: as you type, offer matching categories, tags, recipe names and authors.
+// Suggestions while typing. The search box submits when you pick one;
+// the category box on the recipe form (data-submit="off") just fills in the text.
 (function () {
   document.querySelectorAll("input[data-suggest]").forEach(function (input) {
     const box = document.getElementById(input.dataset.box);
@@ -61,20 +61,27 @@
     function choose(i) {
       input.value = items[i];
       hide();
-      input.form.submit();
+      if (input.dataset.submit !== "off") input.form.submit();
+    }
+
+    function fetchSuggestions(value) {
+      const url = new URL(input.dataset.suggest, window.location.origin);
+      if (input.dataset.query) {
+        input.dataset.query.split("&").forEach(function (pair) {
+          const [k, v] = pair.split("=");
+          url.searchParams.set(k, v);
+        });
+      }
+      url.searchParams.set("q", value);
+      return fetch(url).then(function (resp) { return resp.json(); });
     }
 
     input.addEventListener("input", function () {
       clearTimeout(timer);
       const value = input.value.trim();
       if (!value) return render([]);
-      timer = setTimeout(async function () {
-        try {
-          const resp = await fetch(input.dataset.suggest + "?q=" + encodeURIComponent(value));
-          render(await resp.json());
-        } catch (err) {
-          render([]);
-        }
+      timer = setTimeout(function () {
+        fetchSuggestions(value).then(render).catch(function () { render([]); });
       }, 120);
     });
 
@@ -87,5 +94,33 @@
     });
 
     input.addEventListener("blur", function () { setTimeout(hide, 150); });
+  });
+})();
+
+// Recipe text size (A− / A+), remembered on this device.
+(function () {
+  const KEY = "rk-text-scale";
+  const MIN = 0.85, MAX = 1.6, STEP = 0.1;
+  let scale = parseFloat(localStorage.getItem(KEY)) || 1;
+  const apply = () => document.documentElement.style.setProperty("--reader-scale", scale.toFixed(2));
+  apply();
+  document.querySelectorAll("[data-size]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const next = scale + parseFloat(btn.dataset.size) * STEP;
+      scale = Math.min(MAX, Math.max(MIN, Math.round(next * 100) / 100));
+      localStorage.setItem(KEY, String(scale));
+      apply();
+    });
+  });
+})();
+
+// Steps you've finished stay ticked on this device, so you can follow along while cooking.
+(function () {
+  document.querySelectorAll(".step-done").forEach(function (box) {
+    const key = "rk-step-" + box.dataset.key;
+    box.checked = localStorage.getItem(key) === "1";
+    box.addEventListener("change", function () {
+      localStorage.setItem(key, box.checked ? "1" : "0");
+    });
   });
 })();

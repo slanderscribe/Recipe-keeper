@@ -286,17 +286,32 @@ input[type="file"] { font-weight: 400; }
   font-weight: 500; margin: 0; display: flex; gap: .6rem; align-items: flex-start; cursor: pointer;
 }
 .checklist input[type="checkbox"] { width: 18px; height: 18px; margin: .2rem 0 0; accent-color: var(--tomato); }
-.steps { list-style: none; padding: 0; counter-reset: step; }
-.steps li {
-  counter-increment: step; position: relative;
-  padding: .2rem 0 .95rem 2.7rem;
+/* readable recipe layout: compact text, scalable with the A− / A+ control */
+.recipe h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); }
+.reader { font-size: calc(1rem * var(--reader-scale, 1)); }
+.reader .checklist label { font-size: 1em; line-height: 1.5; }
+.size-ctl {
+  display: flex; align-items: center; justify-content: flex-end; gap: .4rem;
+  margin: 0 0 .75rem; font-size: .85rem; color: var(--muted);
 }
-.steps li::before {
-  content: counter(step); position: absolute; left: 0; top: 0;
-  width: 1.9rem; height: 1.9rem; border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--butter); font-weight: 800; font-family: Fraunces, Georgia, serif;
+.size-ctl button {
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  border-radius: 999px; padding: .2rem .7rem; font: inherit; font-weight: 700; cursor: pointer;
 }
+.size-ctl button:hover { background: var(--blush); }
+.steps { list-style: none; padding: 0; margin: 0; }
+.steps li { border-bottom: 1px solid var(--line); }
+.steps li:last-child { border-bottom: 0; }
+.step {
+  display: grid; grid-template-columns: auto auto 1fr; gap: .55rem; align-items: start;
+  margin: 0; padding: .65rem .15rem; font-weight: 400; cursor: pointer;
+}
+.step-done { width: 18px; height: 18px; margin: .3rem 0 0; accent-color: var(--olive); }
+.step-num { font-weight: 700; color: var(--tomato-deep); font-variant-numeric: tabular-nums; min-width: 1.6em; }
+.step-text { font-size: 1em; line-height: 1.55; }
+.step-done:checked ~ .step-text { text-decoration: line-through; color: var(--muted); }
+.step-done:checked ~ .step-num { color: var(--muted); }
+.suggest-wrap { display: block; position: relative; }
 .notes { white-space: pre-line; margin: 0; }
 .gallery { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .tile {

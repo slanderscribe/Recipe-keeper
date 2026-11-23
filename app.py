@@ -360,6 +360,14 @@ def suggest():
     if not q:
         return jsonify([])
     db = get_db()
+    if request.args.get("kind") == "category":
+        # Category box on the recipe form: only category names, alphabetical.
+        names = {c.lower(): c for c in DEFAULT_CATEGORIES}
+        for row in db.execute("SELECT DISTINCT category FROM recipes WHERE category != ''"):
+            names.setdefault(row[0].lower(), row[0])
+        matches = [name for name in names.values()
+                   if name.lower().startswith(q) or any(w.startswith(q) for w in name.lower().split())]
+        return jsonify(sorted(matches, key=str.lower)[:8])
     pool = {}
     for name in DEFAULT_CATEGORIES:
         pool.setdefault(name.lower(), name)

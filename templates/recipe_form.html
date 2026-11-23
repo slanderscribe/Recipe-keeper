@@ -32,11 +32,13 @@
     </div>
     <div class="row2">
       <label>Category
-        <input type="text" name="category" list="category-options" value="{{ recipe.category or '' }}"
-               placeholder="Dessert, Dinner, Breakfast…">
-        <datalist id="category-options">
-          {% for c in category_options %}<option value="{{ c }}">{% endfor %}
-        </datalist>
+        <span class="suggest-wrap">
+          <input type="text" name="category" value="{{ recipe.category or '' }}" autocomplete="off"
+                 placeholder="Dessert, Dinner, Breakfast…"
+                 data-suggest="{{ url_for('suggest') }}" data-query="kind=category"
+                 data-box="cat-suggest" data-submit="off">
+          <ul class="suggest" id="cat-suggest" role="listbox" hidden></ul>
+        </span>
       </label>
       <label>Tags (comma separated)
         <input type="text" name="tags" value="{{ (recipe.tags or '').replace(',', ', ') }}" placeholder="dinner, quick, kid-approved">
