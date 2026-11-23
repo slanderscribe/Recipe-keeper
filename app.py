@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, timezone
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
-from shopping import combined_amounts, parse_ingredient, parse_quantity, purchase_text
+from shopping import (combined_amounts, is_known_name, item_key, parse_ingredient, parse_quantity,
+                      purchase_text, rebuild_items)
 from capture import CAPTURE_EXTS, MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
@@ -693,6 +694,7 @@ def add_to_shopping(recipe_id):
             (item_id, recipe_id, recipe["title"], parsed["text"], parsed["amount"],
              parsed["grams"], parsed["count"], stamp))
         added += 1
+    rebuild_items(db)
     db.commit()
     flash(f"Added {added} item(s) to the shopping list." if added
           else "Those items are already on the list.", "ok")
@@ -715,7 +717,7 @@ def shopping_rows():
         detail = None
         sources = []
         if lines:
-            detail = purchase_text(it["name"].lower(), lines)
+            detail = purchase_text(item_key(it["name"].lower()), lines)
             if not detail:
                 # No package rule for this ingredient: list what the recipes call for.
                 detail = combined_amounts(it["name"], lines)
@@ -724,16 +726,23 @@ def shopping_rows():
         elif it["recipe_id"]:
             sources = [(it["recipe_id"], it["recipe_title"] or "Recipe")]
         rows.append({"id": it["id"], "name": it["name"], "checked": it["checked"],
-                     "detail": detail, "sources": sources})
+                     "detail": detail, "sources": sources, "check": not is_known_name(it["name"])})
     return rows
+
+
+def refresh_shopping():
+    """Bring every saved item in line with the current naming rules."""
+    db = get_db()
+    rebuild_items(db)
+    db.commit()
 
 
 def shopping_share_text(rows):
     """One item per line, for pasting into a text message (Walmart Text to Shop) or any app."""
     lines = []
     for row in rows:
-        if row["checked"]:
-            continue
+        if row["checked"] or row["check"]:
+            continue  # ticked items and unrecognised names are not sent to the store
         detail = row["detail"] or ""
         # "1 × 1 lb bag" -> "1 lb bag"; "2 × dozen" -> "2 dozen"
         detail = re.sub(r"^1 × ", "", detail)
@@ -746,12 +755,17 @@ def shopping_share_text(rows):
 
 @app.route("/shopping/share.txt")
 def shopping_share():
+    refresh_shopping()
     return Response(shopping_share_text(shopping_rows()), mimetype="text/plain; charset=utf-8")
 
 
 @app.route("/shopping")
 def shopping():
-    return render_template("shopping.html", items=shopping_rows())
+    refresh_shopping()
+    rows = shopping_rows()
+    return render_template("shopping.html",
+                           items=[r for r in rows if not r["check"]],
+                           check_items=[r for r in rows if r["check"]])
 
 
 @app.route("/shopping/add", methods=["POST"])
@@ -761,6 +775,7 @@ def add_shopping_item():
         db = get_db()
         db.execute("INSERT INTO shopping_items (name, recipe_id, checked, created_at) VALUES (?, NULL, 0, ?)",
                    (name, now()))
+        rebuild_items(db)
         db.commit()
     return redirect(url_for("shopping"))
 

@@ -1,19 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Shopping list · Recipe Keeper{% endblock %}
-{% block content %}
-<section class="hero reveal" style="--i: 0">
-  <p class="eyebrow">Market run</p>
-  <h1>Shopping <em>list</em></h1>
-  <form method="post" action="{{ url_for('add_shopping_item') }}" class="inline-add" style="margin-top: 1rem">
-    <input type="text" name="name" placeholder="Add an item, e.g. 2 lemons" required>
-    <button class="btn">Add</button>
-  </form>
-</section>
-
-{% if items %}
-<ul class="shop card reveal" style="--i: 1">
-  {% for it in items %}
-  <li class="{{ 'done' if it.checked }}" style="animation-delay: {{ loop.index0 * 40 }}ms">
+{% macro row(it) %}
+  <li class="{{ 'done' if it.checked }}">
     <form method="post" action="{{ url_for('toggle_shopping', item_id=it.id) }}">
       <button class="check" title="Tick off" aria-label="Tick off">{{ '✓' if it.checked else '○' }}</button>
     </form>
@@ -33,8 +21,33 @@
       <button class="small danger" title="Remove" aria-label="Remove">×</button>
     </form>
   </li>
-  {% endfor %}
+{% endmacro %}
+{% block content %}
+<section class="hero reveal" style="--i: 0">
+  <p class="eyebrow">Market run</p>
+  <h1>Shopping <em>list</em></h1>
+  <form method="post" action="{{ url_for('add_shopping_item') }}" class="inline-add" style="margin-top: 1rem">
+    <input type="text" name="name" placeholder="Add an item, e.g. 2 lemons" required>
+    <button class="btn">Add</button>
+  </form>
+</section>
+
+{% if check_items %}
+<section class="card reveal" style="--i: 1; margin-bottom: 1rem">
+  <h2 style="margin-top: 0">Check these</h2>
+  <p class="muted">These names were not recognised, so they are not sent to the store. Remove them, or fix the recipe line and add the recipe again.</p>
+  <ul class="shop">
+    {% for it in check_items %}{{ row(it) }}{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if items or check_items %}
+{% if items %}
+<ul class="shop card reveal" style="--i: 2">
+  {% for it in items %}{{ row(it) }}{% endfor %}
 </ul>
+{% endif %}
 <p class="clear-row">
   <button type="button" class="btn" data-share data-share-url="{{ url_for('shopping_share') }}" data-share-title="Shopping list">Share list</button>
 </p>

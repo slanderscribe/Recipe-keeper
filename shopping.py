@@ -359,6 +359,7 @@ def parse_ingredient(line):
         "grams": grams,
         "count": count,
         "amount": " + ".join(amount_bits),
+        "known": is_known_key(key),
     }
 
 
@@ -450,3 +451,86 @@ def combined_amounts(name, lines):
     if len(order) == 1 and not loose:
         return groups[0]
     return " + ".join(groups + list(dict.fromkeys(loose)))
+
+
+# ---------- strict names ----------
+# The only names the shopping list accepts. Keys are singular, lower case, and match the names the
+# parser produces. Anything else goes under "Check these" so a wrong name is never bought by mistake.
+# To accept a new ingredient, add its singular name here.
+KNOWN_INGREDIENTS = set(PACKAGES) | {
+    # produce
+    "onion", "carrot", "celery", "potato", "sweet potato", "ginger", "lime", "orange", "apple", "pear",
+    "blueberry", "strawberry", "raspberry", "cranberry", "peach", "pineapple", "mango", "avocado",
+    "tomato", "cucumber", "zucchini", "spinach", "lettuce", "broccoli", "cauliflower", "mushroom",
+    "bell pepper", "jalapeno", "green onion", "shallot", "parsley", "cilantro", "basil", "mint",
+    "rosemary", "thyme", "oregano", "dill", "pumpkin", "corn", "green bean", "pea", "cabbage",
+    # dairy and eggs
+    "heavy cream", "whipping cream", "half and half", "yogurt", "greek yogurt", "cheddar cheese",
+    "parmesan cheese", "mozzarella cheese", "cheese", "ricotta cheese", "feta cheese", "ice cream",
+    # pantry
+    "bread crumb", "cornmeal", "yeast", "active dry yeast", "rice", "pasta", "spaghetti", "noodle",
+    "pecan", "walnut", "almond", "peanut", "peanut butter", "sunflower seed", "sesame seed",
+    "pumpkin seed", "pumpkin puree", "maple syrup", "corn syrup", "molasses", "cocoa powder",
+    "chocolate", "white chocolate chip", "vanilla", "almond extract", "peppermint extract",
+    "black pepper", "pepper", "paprika", "cumin", "chili powder", "nutmeg", "allspice", "ground ginger",
+    "bay leaf", "garlic powder", "onion powder", "cayenne pepper", "soy sauce", "vinegar",
+    "olive oil", "canola oil", "water", "broth", "chicken broth", "beef broth", "tomato sauce",
+    "canned tomato", "tomato paste", "mayonnaise", "mustard", "ketchup", "salsa", "jam", "jelly",
+    "marshmallow", "sprinkles", "graham cracker", "cookie", "pie crust", "tortilla", "bread", "oat",
+    "cream of tartar", "espresso powder", "instant coffee", "tea", "coffee", "ice",
+    # meat and fish
+    "chicken", "chicken breast", "chicken thigh", "ground beef", "beef", "pork", "bacon", "ham",
+    "sausage", "salmon", "shrimp", "tuna", "tofu",
+}
+def is_known_key(key):
+    return bool(key) and key in KNOWN_INGREDIENTS
+
+
+def is_known_name(name):
+    """True if a stored item name is an ingredient the list recognises."""
+    return is_known_key(item_key((name or "").lower().strip()))
+
+
+def rebuild_items(conn):
+    """Recompute every item from the recipe lines it came from: the name, the amount, and merging of
+    lines that are the same ingredient. Typed-in items are read the same way when their name is known.
+    Run after each change, so rows saved under older rules pick up the current names. The caller commits."""
+    items = conn.execute("SELECT id, name, checked FROM shopping_items ORDER BY id").fetchall()
+    lines = conn.execute("SELECT id, item_id, text FROM shopping_lines ORDER BY id").fetchall()
+    lines_by_item = {}
+    for line in lines:
+        lines_by_item.setdefault(line["item_id"], []).append(line)
+
+    # One unit per recipe line, or per typed-in item that has no lines.
+    units = []  # (checked, key, display, item_id, line_id, parsed_or_None)
+    for it in items:
+        its_lines = lines_by_item.get(it["id"])
+        if its_lines:
+            for line in its_lines:
+                parsed = parse_ingredient(line["text"])
+                units.append((it["checked"], parsed["key"], parsed["name"], it["id"], line["id"], parsed))
+        else:
+            parsed = parse_ingredient(it["name"])
+            if parsed["known"]:
+                units.append((it["checked"], parsed["key"], parsed["name"], it["id"], None, parsed))
+            else:
+                typed = " ".join((it["name"] or "").split())
+                units.append((it["checked"], typed.lower(), typed, it["id"], None, None))
+
+    groups = {}
+    for unit in units:
+        groups.setdefault((unit[0], unit[1]), []).append(unit)
+
+    keep = set()
+    for (checked, key), members in groups.items():
+        target = min(m[3] for m in members)
+        keep.add(target)
+        conn.execute("UPDATE shopping_items SET name=? WHERE id=?", (members[0][2], target))
+        for _, _, _, _, line_id, parsed in members:
+            if line_id is not None:
+                conn.execute("UPDATE shopping_lines SET item_id=?, amount=?, grams=?, count=? WHERE id=?",
+                             (target, parsed["amount"], parsed["grams"], parsed["count"], line_id))
+
+    for it in items:
+        if it["id"] not in keep:
+            conn.execute("DELETE FROM shopping_items WHERE id=?", (it["id"],))
