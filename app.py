@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
+from capture import (MAX_CAPTURE_PAGES, ocr_image, parse_recipe_text,
+                     tesseract_available)
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
 
@@ -468,6 +470,48 @@ def import_link():
         return redirect(url_for("new_recipe"))
     draft = run_import(raw)
     return render_template("recipe_form.html", recipe=draft, mode="new")
+
+
+@app.route("/capture", methods=["GET", "POST"])
+def capture():
+    """Scan handwritten recipes or cookbook pages into a draft recipe."""
+    if request.method == "GET":
+        return render_template("capture.html", tesseract_ok=tesseract_available(),
+                               max_pages=MAX_CAPTURE_PAGES)
+    pages = [f for f in request.files.getlist("pages") if f and f.filename]
+    if not pages:
+        flash("Choose at least one photo.", "warn")
+        return redirect(url_for("capture"))
+    if len(pages) > MAX_CAPTURE_PAGES:
+        flash(f"Scan up to {MAX_CAPTURE_PAGES} pages at a time. Do the rest in a second batch.", "warn")
+        return redirect(url_for("capture"))
+    saved = save_files(pages, IMAGE_EXTS)
+    if not saved:
+        return redirect(url_for("capture"))
+    try:
+        text = "\n".join(ocr_image(os.path.join(UPLOAD_DIR, name)) for name in saved)
+    except RuntimeError as exc:
+        for name in saved:
+            remove_upload(name)
+        flash(str(exc), "error")
+        return redirect(url_for("capture"))
+
+    draft = parse_recipe_text(text)
+    data = recipe_from_form({"title": draft["title"], "ingredients": draft["ingredients"],
+                             "steps": draft["steps"], "notes": draft["notes"]})
+    stamp = now()
+    db = get_db()
+    cur = db.execute(INSERT_SQL, {**data, "created_at": stamp, "updated_at": stamp})
+    recipe_id = cur.lastrowid
+    for name in saved:
+        add_media(recipe_id, "image", filename=name)
+    # The first scan is the recipe picture until you replace it with a photo of the finished dish.
+    db.execute("UPDATE recipes SET cover_image=? WHERE id=?", (saved[0], recipe_id))
+    db.commit()
+    count = len(saved)
+    flash(f"Read {count} page{'s' if count != 1 else ''}. Check the text against the scan and fix "
+          "anything the reader got wrong, then save.", "ok")
+    return redirect(url_for("edit_recipe", recipe_id=recipe_id))
 
 
 @app.route("/recipes/<int:recipe_id>")
