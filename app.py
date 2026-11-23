@@ -35,6 +35,8 @@ SUGGESTED_CATEGORIES = ["Holiday", "Christmas", "Thanksgiving", "Easter", "Birth
                         "Vegetarian", "Gluten-free", "Summer", "Winter"]
 
 app = Flask(__name__)
+# Template check: is this ingredient line a sub-heading or a recipe part rather than something to buy?
+app.jinja_env.filters["is_part"] = lambda text: parse_ingredient(text)["part"]
 app.secret_key = os.environ.get("SECRET_KEY") or hashlib.sha256(
     f"recipe-keeper:{APP_PASSWORD}".encode()).hexdigest()
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024

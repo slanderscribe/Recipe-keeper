@@ -64,7 +64,11 @@
       <form method="post" action="{{ url_for('add_to_shopping', recipe_id=r.id) }}">
         <ul class="checklist">
           {% for ing in ingredients %}
+          {% if ing|is_part %}
+          <li class="subhead" style="list-style: none; font-weight: 700; margin-top: .6rem">{{ ing }}</li>
+          {% else %}
           <li><label><input type="checkbox" name="items" value="{{ ing }}" checked> {{ ing }}</label></li>
+          {% endif %}
           {% endfor %}
         </ul>
         <button class="btn">Add checked to shopping list</button>
