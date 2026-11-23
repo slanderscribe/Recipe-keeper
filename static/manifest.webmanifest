@@ -1,0 +1,16 @@
+{
+  "name": "Recipe Keeper",
+  "short_name": "Recipes",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf6ef",
+  "theme_color": "#c2410c",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "share_target": {
+    "action": "/import",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  }
+}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <form method="get" action="{{ url_for('index') }}" class="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search recipes, ingredients or creators">
+    {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+    <button class="btn">Search</button>
+  </form>
+  {% if all_tags %}
+  <div class="chips">
+    <a class="chip {{ 'active' if not tag }}" href="{{ url_for('index', q=q) }}">All</a>
+    {% for t in all_tags %}
+      <a class="chip {{ 'active' if t == tag }}" href="{{ url_for('index', tag=t, q=q) }}">#{{ t }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+{% if recipes %}
+<div class="grid">
+  {% for r in recipes %}
+  <a class="card recipe-card" href="{{ url_for('view_recipe', recipe_id=r.id) }}">
+    {% set cov = cover_url(r.cover_image) %}
+    <div class="cover">
+      {% if cov %}<img src="{{ cov }}" alt="" loading="lazy">{% else %}<span>🍽️</span>{% endif %}
+    </div>
+    <div class="body">
+      <h3>{{ r.title }}</h3>
+      <p class="meta">
+        {% if r.source_platform and r.source_platform != 'web' %}<span class="pill">{{ r.source_platform }}</span>{% endif %}
+        {% if r.source_author %}{{ r.source_author }}{% endif %}
+        {% if r.rating %}<span class="stars">{{ '★' * r.rating }}</span>{% endif %}
+      </p>
+      {% if r.tags %}
+      <p class="tags">{% for t in r.tags.split(',') if t %}<span>#{{ t }}</span> {% endfor %}</p>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty">
+  <h2>{{ 'No recipes match that.' if q or tag else 'Your recipe box is empty.' }}</h2>
+  <p>Paste a link from Instagram, TikTok, YouTube or a recipe site, or type one in by hand.</p>
+  <a class="btn" href="{{ url_for('new_recipe') }}">Add a recipe</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#c2410c">
+  <title>{% block title %}Recipe Keeper{% endblock %}</title>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">🍳 Recipe Keeper</a>
+    <nav>
+      <a href="{{ url_for('index') }}">Recipes</a>
+      <a href="{{ url_for('new_recipe') }}">+ Add</a>
+      <a href="{{ url_for('shopping') }}">Shopping{% if shopping_count %} <span class="badge">{{ shopping_count }}</span>{% endif %}</a>
+      <a href="{{ url_for('export_zip') }}">Backup</a>
+      {% if logged_in %}<a href="{{ url_for('logout') }}">Log out</a>{% endif %}
+    </nav>
+  </header>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash {{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

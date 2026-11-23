@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }} · Recipe Keeper{% endblock %}
+{% block content %}
+{% set cov = cover_url(r.cover_image) %}
+<article class="recipe">
+  <header class="recipe-head">
+    {% if cov %}<img class="hero-img" src="{{ cov }}" alt="">{% endif %}
+    <div>
+      <h1>{{ r.title }}</h1>
+      {% if r.description %}<p class="lede">{{ r.description }}</p>{% endif %}
+      <p class="chips-row">
+        {% if r.servings %}<span class="pill">Serves {{ r.servings }}</span>{% endif %}
+        {% if r.prep_minutes %}<span class="pill">Prep {{ r.prep_minutes }} min</span>{% endif %}
+        {% if r.cook_minutes %}<span class="pill">Cook {{ r.cook_minutes }} min</span>{% endif %}
+        {% for t in tags %}<span class="pill soft">#{{ t }}</span>{% endfor %}
+      </p>
+      <form method="post" action="{{ url_for('set_rating', recipe_id=r.id) }}" class="stars-form">
+        {% for n in range(1, 6) %}
+          <button name="rating" value="{{ n }}" class="star {{ 'on' if r.rating and n <= r.rating }}"
+                  title="{{ n }} star{{ '' if n == 1 else 's' }}">★</button>
+        {% endfor %}
+      </form>
+      <p class="actions">
+        <a class="btn ghost" href="{{ url_for('edit_recipe', recipe_id=r.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('delete_recipe', recipe_id=r.id) }}" class="inline"
+              onsubmit="return confirm('Delete this recipe and all its photos and videos?')">
+          <button class="btn ghost danger">Delete</button>
+        </form>
+      </p>
+    </div>
+  </header>
+
+  {% if r.source_url %}
+  {% set emb = embed_src(r.source_url) %}
+  <section class="card">
+    <h2>Original post</h2>
+    <p>
+      <span class="pill">{{ r.source_platform or 'web' }}</span>
+      {% if r.source_author %}by {{ r.source_author }}{% endif %}
+      <a href="{{ r.source_url }}" target="_blank" rel="noopener">Open original ↗</a>
+    </p>
+    {% if emb %}
+    <div class="embed">
+      <iframe src="{{ emb }}" loading="lazy" allowfullscreen allow="encrypted-media; picture-in-picture"></iframe>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <div class="two-col">
+    <section class="card">
+      <h2>Ingredients</h2>
+      {% if ingredients %}
+      <form method="post" action="{{ url_for('add_to_shopping', recipe_id=r.id) }}">
+        <ul class="checklist">
+          {% for ing in ingredients %}
+          <li><label><input type="checkbox" name="items" value="{{ ing }}" checked> {{ ing }}</label></li>
+          {% endfor %}
+        </ul>
+        <button class="btn">Add checked to shopping list</button>
+      </form>
+      {% else %}
+      <p class="muted">No ingredients yet. Use Edit to add them.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Steps</h2>
+      {% if steps %}
+      <ol class="steps">
+        {% for s in steps %}<li>{{ s }}</li>{% endfor %}
+      </ol>
+      {% else %}
+      <p class="muted">No steps yet.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  {% if r.notes %}
+  <section class="card">
+    <h2>Notes</h2>
+    <p class="notes">{{ r.notes }}</p>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>Photos, videos & links</h2>
+    {% if media %}
+    <div class="gallery">
+      {% for m in media %}
+        {% if m.kind == 'image' %}
+        <figure class="tile">
+          <a href="{{ url_for('uploaded_file', filename=m.filename) }}" target="_blank">
+            <img src="{{ url_for('uploaded_file', filename=m.filename) }}" alt="" loading="lazy">
+          </a>
+          <figcaption class="tile-actions">
+            <form method="post" action="{{ url_for('make_cover', media_id=m.id) }}">
+              <button class="small">Use as cover</button>
+            </form>
+            <form method="post" action="{{ url_for('delete_media', media_id=m.id) }}"
+                  onsubmit="return confirm('Remove this photo?')">
+              <button class="small danger">Remove</button>
+            </form>
+          </figcaption>
+        </figure>
+        {% elif m.kind == 'video' %}
+        <figure class="tile wide">
+          <video controls preload="metadata" src="{{ url_for('uploaded_file', filename=m.filename) }}"></video>
+          <figcaption class="tile-actions">
+            <form method="post" action="{{ url_for('delete_media', media_id=m.id) }}"
+                  onsubmit="return confirm('Remove this video?')">
+              <button class="small danger">Remove</button>
+            </form>
+          </figcaption>
+        </figure>
+        {% else %}
+        {% set emb = embed_src(m.url) %}
+        <figure class="tile wide">
+          {% if emb %}
+          <iframe src="{{ emb }}" loading="lazy" allowfullscreen allow="encrypted-media; picture-in-picture"></iframe>
+          {% endif %}
+          <figcaption class="tile-actions">
+            <a href="{{ m.url }}" target="_blank" rel="noopener">{{ detect_platform(m.url) | capitalize }} link ↗</a>
+            <form method="post" action="{{ url_for('delete_media', media_id=m.id) }}"
+                  onsubmit="return confirm('Remove this link?')">
+              <button class="small danger">Remove</button>
+            </form>
+          </figcaption>
+        </figure>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">Nothing attached yet. Use Edit to add photos, videos or links.</p>
+    {% endif %}
+  </section>
+</article>
+{% endblock %}

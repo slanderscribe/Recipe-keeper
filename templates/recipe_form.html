@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Add a recipe' if mode == 'new' else 'Edit recipe' }} · Recipe Keeper{% endblock %}
+{% block content %}
+<h1>{{ 'Add a recipe' if mode == 'new' else 'Edit recipe' }}</h1>
+
+{% if mode == 'new' %}
+<section class="card import-box">
+  <h2>Import from a link</h2>
+  <p class="muted">Paste a link from Instagram, TikTok, YouTube, Pinterest or a recipe site. We'll fill in what we can, then you check it and save.</p>
+  <form method="post" action="{{ url_for('import_link') }}" class="inline-add">
+    <input type="url" name="url" placeholder="https://..." required>
+    <button class="btn">Import</button>
+  </form>
+</section>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="recipe-form"
+      action="{{ url_for('new_recipe') if mode == 'new' else url_for('edit_recipe', recipe_id=recipe.id) }}">
+  <input type="hidden" name="cover_image" value="{{ recipe.cover_image or '' }}">
+
+  <section class="card">
+    <label>Title
+      <input type="text" name="title" value="{{ recipe.title or '' }}" required>
+    </label>
+    <label>Description
+      <textarea name="description" rows="2" placeholder="A line about it: who it's for, why you love it">{{ recipe.description or '' }}</textarea>
+    </label>
+    <div class="row3">
+      <label>Serves <input type="text" name="servings" value="{{ recipe.servings or '' }}"></label>
+      <label>Prep (min) <input type="number" min="0" name="prep_minutes" value="{{ recipe.prep_minutes or '' }}"></label>
+      <label>Cook (min) <input type="number" min="0" name="cook_minutes" value="{{ recipe.cook_minutes or '' }}"></label>
+    </div>
+    <div class="row2">
+      <label>Tags (comma separated)
+        <input type="text" name="tags" value="{{ (recipe.tags or '').replace(',', ', ') }}" placeholder="dinner, quick, kid-approved">
+      </label>
+      <label>Family rating
+        <select name="rating">
+          <option value="">Not rated</option>
+          {% for n in range(1, 6) %}
+          <option value="{{ n }}" {% if recipe.rating == n %}selected{% endif %}>{{ n }} ★</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Where it came from</h2>
+    <div class="row2">
+      <label>Link to the original post or page
+        <input type="url" name="source_url" value="{{ recipe.source_url or '' }}" placeholder="https://...">
+      </label>
+      <label>Creator or site name
+        <input type="text" name="source_author" value="{{ recipe.source_author or '' }}">
+      </label>
+    </div>
+  </section>
+
+  <div class="two-col">
+    <section class="card">
+      <label>Ingredients <span class="muted small">(one per line)</span>
+        <textarea name="ingredients" rows="12" placeholder="2 cups flour&#10;1 tsp salt">{{ recipe.ingredients or '' }}</textarea>
+      </label>
+    </section>
+    <section class="card">
+      <label>Steps <span class="muted small">(one per line)</span>
+        <textarea name="steps" rows="12" placeholder="Preheat the oven to 350°F.&#10;Mix the dry ingredients.">{{ recipe.steps or '' }}</textarea>
+      </label>
+    </section>
+  </div>
+
+  <section class="card">
+    <label>Notes
+      <textarea name="notes" rows="3" placeholder="Swaps, tips, what the kids said">{{ recipe.notes or '' }}</textarea>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Photos, videos & links</h2>
+    <label>Photos <input type="file" name="photos" accept="image/*" multiple></label>
+    <label>Videos <input type="file" name="videos" accept="video/*" multiple></label>
+    <label>Post or video links <span class="muted small">(one per line)</span>
+      <textarea name="links" rows="3" placeholder="https://www.tiktok.com/@someone/video/..."></textarea>
+    </label>
+    <p class="muted small">Files up to {{ max_mb }} MB per save. Everything is stored with the app, so it stays with the recipe.</p>
+  </section>
+
+  <div class="form-actions">
+    <button class="btn big">Save recipe</button>
+    <a class="btn ghost" href="{{ url_for('index') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
