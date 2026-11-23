@@ -18,9 +18,8 @@
       <button class="check" title="Tick off" aria-label="Tick off">{{ '✓' if it.checked else '○' }}</button>
     </form>
     <span class="item-name">{{ it.name }}</span>
-    {% if it.recipe_title %}
-    <a class="from" href="{{ url_for('view_recipe', recipe_id=it.recipe_id) }}">{{ it.recipe_title }}</a>
-    {% endif %}
+    {% if it.detail %}<span class="muted small item-detail">{{ it.detail }}</span>{% endif %}
+    {% for title in it.sources %}<span class="from">{{ title }}</span>{% endfor %}
     <form method="post" action="{{ url_for('delete_shopping', item_id=it.id) }}">
       <button class="small danger" title="Remove" aria-label="Remove">×</button>
     </form>

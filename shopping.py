@@ -1,0 +1,234 @@
+"""Turn recipe ingredient lines into shopping items: one item per ingredient, with the amount
+rounded up to the whole package you would buy.
+
+The package sizes are typical US store sizes and are approximate. Edit PACKAGES to match what
+your store sells.
+"""
+import math
+import re
+from fractions import Fraction
+
+# Grams per cup for dry goods (liquids default to 1 g per ml).
+# packs: (size, label). For "each" items, size is a count.
+PACKAGES = {
+    "flour": {"per_cup": 125, "packs": [(454, "1 lb bag"), (907, "2 lb bag"), (1814, "4 lb bag")]},
+    "sugar": {"per_cup": 200, "packs": [(907, "2 lb bag"), (1814, "4 lb bag")]},
+    "brown sugar": {"per_cup": 200, "packs": [(454, "1 lb bag"), (907, "2 lb bag")]},
+    "butter": {"per_cup": 227, "stick_g": 113, "packs": [(454, "1 lb (4 sticks)")]},
+    "egg": {"each": True, "packs": [(12, "dozen")]},
+    "milk": {"per_cup": 240, "packs": [(946, "quart"), (1893, "half gallon")]},
+    "vegetable oil": {"per_cup": 218, "packs": [(946, "32 oz bottle"), (1419, "48 oz bottle")]},
+    "honey": {"per_cup": 340, "packs": [(340, "12 oz bottle"), (680, "24 oz bottle")]},
+    "vanilla extract": {"packs": [(59, "2 fl oz bottle"), (118, "4 fl oz bottle")]},
+    "salt": {"per_cup": 288, "packs": [(737, "26 oz box")]},
+    "baking soda": {"per_cup": 220, "packs": [(454, "1 lb box")]},
+    "cinnamon": {"per_cup": 130, "packs": [(57, "2 oz jar")]},
+    "rolled oats": {"per_cup": 90, "packs": [(510, "18 oz canister"), (1190, "42 oz canister")]},
+    "wheat germ": {"per_cup": 115, "packs": [(340, "12 oz jar")]},
+    "wheat bran": {"per_cup": 60, "packs": [(340, "12 oz bag")]},
+    "coconut": {"per_cup": 85, "packs": [(340, "12 oz bag")]},
+    "chocolate chips": {"per_cup": 170, "packs": [(340, "12 oz bag")]},
+    "cornstarch": {"per_cup": 120, "packs": [(340, "12 oz box")]},
+}
+
+# Other names for the same thing, so "all-purpose flour" and "flour" share one item.
+SYNONYMS = [
+    (r"^(all[- ]purpose |ap |plain |white )?flour$", "flour"),
+    (r"^(granulated |white |caster )?sugar$", "sugar"),
+    (r"^(light |dark |packed |firmly packed )?(brown|br\.?) sugar$", "brown sugar"),
+    (r"^(unsalted |salted )?butter$", "butter"),
+    (r"^(large |extra[- ]large |medium |small )?eggs?$", "egg"),
+    (r"^(whole |2% |skim )?milk$", "milk"),
+    (r"^(vegetable |canola |light )?oil$", "vegetable oil"),
+    (r"^(pure )?vanilla( extract)?$", "vanilla extract"),
+    (r"^(table |kosher |fine sea )?salt$", "salt"),
+    (r"^(baking soda|bicarbonate of soda)$", "baking soda"),
+    (r"^(ground )?cinnamon$", "cinnamon"),
+    (r"^(old[- ]fashioned |rolled )?oats$", "rolled oats"),
+    (r"^(rolled oats)$", "rolled oats"),
+    (r"^wheat germ$", "wheat germ"),
+    (r"^(wheat )?bran$", "wheat bran"),
+    (r"^(shredded |sweetened |unsweetened )?coconut$", "coconut"),
+    (r"^(semi[- ]sweet |mini )?chocolate chips?$", "chocolate chips"),
+    (r"^(corn ?starch)$", "cornstarch"),
+    (r"^honey$", "honey"),
+]
+
+# Words that describe an ingredient but are not part of what you buy.
+DESCRIPTORS = [
+    "large", "medium", "small", "extra large", "fresh", "freshly", "chopped", "minced", "diced",
+    "sliced", "sifted", "softened", "melted", "room temperature", "cold", "divided", "packed",
+    "finely", "coarsely", "beaten", "optional", "to taste", "or as needed", "as needed", "at room temperature",
+]
+
+UNIT_MAP = {
+    # volume, in ml
+    "cup": ("ml", 237), "cups": ("ml", 237), "c": ("ml", 237),
+    "tbsp": ("ml", 14.8), "tbsps": ("ml", 14.8), "tablespoon": ("ml", 14.8), "tablespoons": ("ml", 14.8),
+    "tsp": ("ml", 4.93), "tsps": ("ml", 4.93), "teaspoon": ("ml", 4.93), "teaspoons": ("ml", 4.93),
+    "fl oz": ("ml", 29.57), "floz": ("ml", 29.57),
+    "ml": ("ml", 1), "l": ("ml", 1000), "liter": ("ml", 1000), "liters": ("ml", 1000),
+    "litre": ("ml", 1000), "litres": ("ml", 1000),
+    # weight, in grams
+    "oz": ("g", 28.35), "ounce": ("g", 28.35), "ounces": ("g", 28.35),
+    "lb": ("g", 453.6), "lbs": ("g", 453.6), "pound": ("g", 453.6), "pounds": ("g", 453.6),
+    "g": ("g", 1), "gram": ("g", 1), "grams": ("g", 1), "kg": ("g", 1000),
+    # butter sticks use the stick weight from PACKAGES
+    "stick": ("stick", 1), "sticks": ("stick", 1),
+}
+# Count words with no weight or volume: kept as the unit, but not converted.
+COUNT_UNITS = {"can": "can", "cans": "can", "clove": "clove", "cloves": "clove", "pinch": "pinch",
+               "pinches": "pinch", "dash": "dash", "package": "package", "packages": "package",
+               "pkg": "package", "pkgs": "package", "bag": "bag", "bags": "bag", "jar": "jar", "jars": "jar"}
+# Upper-case or dotted abbreviations are matched exactly, because "T" (tablespoon) and "t" (teaspoon) differ.
+EXACT_UNITS = {"T": "tbsp", "T.": "tbsp", "t": "tsp", "t.": "tsp", "c.": "cup", "c": "cup",
+               "tbs": "tbsp", "tbs.": "tbsp", "tsp.": "tsp", "tbsp.": "tbsp", "oz.": "oz", "lb.": "lb"}
+
+FRACTION_CHARS = {"¼": "1/4", "½": "1/2", "¾": "3/4", "⅓": "1/3", "⅔": "2/3", "⅛": "1/8"}
+
+
+def parse_quantity(text):
+    """Read a leading amount like '2', '1/2', '1 1/2' or '½'. Returns (value, rest)."""
+    for char, frac in FRACTION_CHARS.items():
+        text = text.replace(char, frac if text.startswith(char) else f" {frac}")
+    match = re.match(r"^\s*(\d+)\s+(\d+/\d+)\b\s*", text)
+    if match:
+        value = float(int(match.group(1)) + Fraction(match.group(2)))
+        return value, text[match.end():]
+    match = re.match(r"^\s*(\d+/\d+|\d+(?:\.\d+)?)\s*", text)
+    if match:
+        part = match.group(1)
+        value = float(Fraction(part)) if "/" in part else float(part)
+        return value, text[match.end():]
+    return None, text
+
+
+def parse_unit(rest):
+    """Read a unit at the start of the rest of the line. Returns (unit_name or None, rest)."""
+    stripped = rest.lstrip()
+    for token in sorted(list(EXACT_UNITS) + list(UNIT_MAP) + ["fl. oz", "fl oz"], key=len, reverse=True):
+        pattern = r"^" + re.escape(token) + r"(?=\s|$|[,.(])"
+        if re.match(pattern, stripped, re.IGNORECASE if token not in EXACT_UNITS else 0):
+            if token in EXACT_UNITS:
+                unit = EXACT_UNITS[token]
+            else:
+                unit = token.lower().replace("fl. oz", "fl oz")
+            after = stripped[len(token):]
+            after = re.sub(r"^\.", "", after)
+            return unit, after
+    for token in sorted(COUNT_UNITS, key=len, reverse=True):
+        if re.match(r"^" + re.escape(token) + r"(?=\s|$)", stripped, re.IGNORECASE):
+            return COUNT_UNITS[token], stripped[len(token):]
+    return None, rest
+
+
+def normalize_name(text):
+    text = re.sub(r"\(.*?\)", " ", text)
+    text = text.split(",")[0]
+    text = re.sub(r"^\s*of\s+", "", text.strip(), flags=re.IGNORECASE)
+    lowered = text.lower()
+    for word in sorted(DESCRIPTORS, key=len, reverse=True):
+        lowered = re.sub(r"\b" + re.escape(word) + r"\b", " ", lowered)
+    lowered = re.sub(r"[^a-z\s\-\.]", " ", lowered)
+    return re.sub(r"\s+", " ", lowered).strip(" .-")
+
+
+def item_key(name):
+    for pattern, key in SYNONYMS:
+        if re.match(pattern, name):
+            return key
+    return name
+
+
+def display_name(key):
+    return key[:1].upper() + key[1:]
+
+
+def parse_ingredient(line):
+    """Read one ingredient line into its amount, unit and what it is."""
+    original = " ".join(line.split())
+    text = re.sub(r"\(.*?\)", " ", original)
+    value, rest = parse_quantity(text)
+    unit, rest = parse_unit(rest) if value is not None else (None, text)
+    name = normalize_name(rest)
+    key = item_key(name) if name else ""
+    grams = None
+    count = None
+    if value is not None and key in PACKAGES:
+        spec = PACKAGES[key]
+        if spec.get("each") and unit is None:
+            count = value
+        elif unit is not None and unit in UNIT_MAP:
+            base, factor = UNIT_MAP[unit]
+            if base == "stick":
+                stick = spec.get("stick_g")
+                grams = value * stick if stick else None
+            elif base == "ml":
+                ml = value * factor
+                grams = ml * (spec["per_cup"] / 237) if "per_cup" in spec else ml
+            else:
+                grams = value * factor
+    amount_text = " ".join(part for part in (format_amount(value), unit or "") if part)
+    return {
+        "text": original,
+        "key": key or name or original.lower(),
+        "name": display_name(key or name or original),
+        "grams": grams,
+        "count": count,
+        "amount": amount_text,
+    }
+
+
+def format_amount(value):
+    if value is None:
+        return ""
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def choose_package(key, grams, count):
+    """Smallest package that covers the total; more of the largest one if needed."""
+    spec = PACKAGES.get(key)
+    if not spec:
+        return None
+    need = count if spec.get("each") else grams
+    if need is None or need <= 0:
+        return None
+    packs = sorted(spec["packs"])
+    for size, label in packs:
+        if size >= need:
+            return f"1 × {label}"
+    size, label = packs[-1]
+    return f"{math.ceil(need / size)} × {label}"
+
+
+def purchase_text(key, lines):
+    """What to buy for one item across all its recipe lines, or None if we can't work it out."""
+    if not lines:
+        return None
+    if key not in PACKAGES:
+        return None
+    if any(l["grams"] is None and l["count"] is None for l in lines):
+        return None
+    grams = sum(l["grams"] or 0 for l in lines) or None
+    count = sum(l["count"] or 0 for l in lines) or None
+    return choose_package(key, grams, count)
+
+
+def combined_amounts(name, lines):
+    """For items with no package rule: add up the amounts the recipes call for."""
+    totals, order, loose = {}, [], []
+    for line in lines:
+        value, rest = parse_quantity(line["amount"] or "")
+        if value is None:
+            loose.append(line["text"])
+            continue
+        unit = rest.strip()
+        if unit not in totals:
+            totals[unit] = 0
+            order.append(unit)
+        totals[unit] += value
+    parts = [" ".join(p for p in (format_amount(totals[u]), u, name.lower()) if p) for u in order]
+    parts += list(dict.fromkeys(loose))
+    return ("Total: " if order else "") + "; ".join(parts)

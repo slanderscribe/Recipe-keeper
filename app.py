@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
+from shopping import combined_amounts, parse_ingredient, parse_quantity, purchase_text
 from capture import CAPTURE_EXTS, MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
@@ -75,6 +76,18 @@ CREATE TABLE IF NOT EXISTS shopping_items (
     name TEXT NOT NULL,
     recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
     checked INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+-- One line per recipe ingredient that feeds a shopping item (several recipes can share one item).
+CREATE TABLE IF NOT EXISTS shopping_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL REFERENCES shopping_items(id) ON DELETE CASCADE,
+    recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL,
+    recipe_title TEXT NOT NULL DEFAULT '',
+    text TEXT NOT NULL,
+    amount TEXT NOT NULL DEFAULT '',
+    grams REAL,
+    count REAL,
     created_at TEXT NOT NULL
 );
 """
@@ -649,33 +662,74 @@ def uploaded_file(filename):
 
 @app.route("/recipes/<int:recipe_id>/shopping", methods=["POST"])
 def add_to_shopping(recipe_id):
+    """Add checked ingredients. The same ingredient from several recipes stacks into one item."""
     db = get_db()
-    if not db.execute("SELECT 1 FROM recipes WHERE id=?", (recipe_id,)).fetchone():
+    recipe = db.execute("SELECT id, title FROM recipes WHERE id=?", (recipe_id,)).fetchone()
+    if not recipe:
         abort(404)
     added = 0
-    for item in request.form.getlist("items"):
-        name = item.strip()
-        if not name:
+    stamp = now()
+    for raw in request.form.getlist("items"):
+        if not raw.strip():
             continue
-        exists = db.execute(
-            "SELECT 1 FROM shopping_items WHERE checked=0 AND lower(name)=lower(?)", (name,)).fetchone()
-        if not exists:
-            db.execute("INSERT INTO shopping_items (name, recipe_id, checked, created_at) VALUES (?, ?, 0, ?)",
-                       (name, recipe_id, now()))
-            added += 1
+        parsed = parse_ingredient(raw)
+        item = db.execute(
+            "SELECT id FROM shopping_items WHERE checked=0 AND lower(name)=lower(?)",
+            (parsed["name"],)).fetchone()
+        if item:
+            item_id = item["id"]
+        else:
+            item_id = db.execute(
+                "INSERT INTO shopping_items (name, recipe_id, checked, created_at) VALUES (?, NULL, 0, ?)",
+                (parsed["name"], stamp)).lastrowid
+        already = db.execute(
+            "SELECT 1 FROM shopping_lines WHERE item_id=? AND recipe_id=? AND text=?",
+            (item_id, recipe_id, parsed["text"])).fetchone()
+        if already:
+            continue
+        db.execute(
+            """INSERT INTO shopping_lines (item_id, recipe_id, recipe_title, text, amount, grams, count,
+               created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (item_id, recipe_id, recipe["title"], parsed["text"], parsed["amount"],
+             parsed["grams"], parsed["count"], stamp))
+        added += 1
     db.commit()
     flash(f"Added {added} item(s) to the shopping list." if added
           else "Those items are already on the list.", "ok")
     return redirect(url_for("view_recipe", recipe_id=recipe_id))
 
 
-@app.route("/shopping")
-def shopping():
-    items = get_db().execute(
+def shopping_rows():
+    """Each item with the amount to buy, and the recipes it comes from."""
+    db = get_db()
+    items = db.execute(
         """SELECT s.*, r.title AS recipe_title
            FROM shopping_items s LEFT JOIN recipes r ON r.id = s.recipe_id
            ORDER BY s.checked, s.created_at, s.id""").fetchall()
-    return render_template("shopping.html", items=items)
+    lines_by_item = {}
+    for line in db.execute("SELECT * FROM shopping_lines ORDER BY id"):
+        lines_by_item.setdefault(line["item_id"], []).append(line)
+    rows = []
+    for it in items:
+        lines = lines_by_item.get(it["id"], [])
+        detail = None
+        sources = []
+        if lines:
+            detail = purchase_text(it["name"].lower(), lines)
+            if not detail:
+                # No package rule for this ingredient: list what the recipes call for.
+                detail = combined_amounts(it["name"], lines)
+            sources = list(dict.fromkeys(l["recipe_title"] for l in lines if l["recipe_title"]))
+        elif it["recipe_title"]:
+            sources = [it["recipe_title"]]
+        rows.append({"id": it["id"], "name": it["name"], "checked": it["checked"],
+                     "detail": detail, "sources": sources})
+    return rows
+
+
+@app.route("/shopping")
+def shopping():
+    return render_template("shopping.html", items=shopping_rows())
 
 
 @app.route("/shopping/add", methods=["POST"])
