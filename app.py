@@ -7,7 +7,7 @@ import os
 import sqlite3
 import uuid
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for)
@@ -28,6 +28,10 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or hashlib.sha256(
     f"recipe-keeper:{APP_PASSWORD}".encode()).hexdigest()
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+# "Keep this device signed in" lasts a year. Cookies are only marked Secure on Railway (HTTPS).
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=365)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("RAILWAY_ENVIRONMENT_NAME"))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS recipes (
@@ -228,7 +232,7 @@ def run_import(raw_url):
         flash("Paste a link first.", "error")
         return {}
     try:
-        draft, message = import_from_url(url)
+        draft, message = import_from_url(url, UPLOAD_DIR)
         flash(message, "ok")
         return draft
     except ImportProblem as exc:
@@ -256,7 +260,7 @@ def login():
         if hmac.compare_digest(typed, APP_PASSWORD.encode()):
             session.clear()
             session["ok"] = True
-            session.permanent = True
+            session.permanent = bool(request.form.get("remember"))
             nxt = request.args.get("next", "")
             if not nxt.startswith("/") or nxt.startswith("//"):
                 nxt = url_for("index")
@@ -320,9 +324,38 @@ def new_recipe():
     return render_template("recipe_form.html", recipe={}, mode="new")
 
 
+def ext_of(filename):
+    return filename.rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+
+
+def save_shared(files, values):
+    """Create a recipe from files shared from the phone, such as a video saved from TikTok."""
+    link = normalize_url(values.get("url", "")) or extract_first_url(values.get("text", ""))
+    title = (values.get("title") or "").strip() or "Shared recipe"
+    data = recipe_from_form({"title": title, "source_url": link})
+    stamp = now()
+    db = get_db()
+    cur = db.execute(INSERT_SQL, {**data, "created_at": stamp, "updated_at": stamp})
+    recipe_id = cur.lastrowid
+    photos = save_files([f for f in files if ext_of(f.filename) in IMAGE_EXTS], IMAGE_EXTS)
+    clips = save_files([f for f in files if ext_of(f.filename) in VIDEO_EXTS], VIDEO_EXTS)
+    for name in photos:
+        add_media(recipe_id, "image", filename=name)
+    for name in clips:
+        add_media(recipe_id, "video", filename=name)
+    if photos:
+        db.execute("UPDATE recipes SET cover_image=? WHERE id=?", (photos[0], recipe_id))
+    db.commit()
+    flash("Saved to Recipe Keeper. Add the ingredients and steps, then save.", "ok")
+    return redirect(url_for("edit_recipe", recipe_id=recipe_id))
+
+
 @app.route("/import", methods=["GET", "POST"])
 def import_link():
-    """Import a shared link. Also serves as the phone share target (GET with url/text)."""
+    """Import a link, or save files shared from the phone (the share target posts here)."""
+    shared = [f for f in request.files.getlist("media") if f and f.filename]
+    if shared:
+        return save_shared(shared, request.values)
     raw = (request.values.get("url") or extract_first_url(request.values.get("text", ""))
            or extract_first_url(request.values.get("title", "")))
     if not raw:

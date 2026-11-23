@@ -3,20 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#c2410c">
+  <meta name="theme-color" content="#e0533a">
   <title>{% block title %}Recipe Keeper{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600..800&family=Inter:wght@400..600&display=swap" rel="stylesheet">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
+  <div class="blob b1" aria-hidden="true"></div>
+  <div class="blob b2" aria-hidden="true"></div>
+  <div class="blob b3" aria-hidden="true"></div>
+  {% set ep = request.endpoint %}
   <header class="topbar">
-    <a class="brand" href="{{ url_for('index') }}">🍳 Recipe Keeper</a>
-    <nav>
-      <a href="{{ url_for('index') }}">Recipes</a>
-      <a href="{{ url_for('new_recipe') }}">+ Add</a>
-      <a href="{{ url_for('shopping') }}">Shopping{% if shopping_count %} <span class="badge">{{ shopping_count }}</span>{% endif %}</a>
-      <a href="{{ url_for('export_zip') }}">Backup</a>
-      {% if logged_in %}<a href="{{ url_for('logout') }}">Log out</a>{% endif %}
+    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍳</span>Recipe Keeper</a>
+    <nav class="tabs" id="tabs">
+      <span class="tab-indicator" aria-hidden="true"></span>
+      <a class="tab {{ 'is-active' if ep in ('index', 'view_recipe', 'edit_recipe') }}" href="{{ url_for('index') }}">Recipes</a>
+      <a class="tab {{ 'is-active' if ep in ('new_recipe', 'import_link') }}" href="{{ url_for('new_recipe') }}">+ Add</a>
+      <a class="tab {{ 'is-active' if ep == 'shopping' }}" href="{{ url_for('shopping') }}">Shopping{% if shopping_count %} <span class="badge">{{ shopping_count }}</span>{% endif %}</a>
+      <a class="tab" href="{{ url_for('export_zip') }}">Backup</a>
+      {% if logged_in %}<a class="tab" href="{{ url_for('logout') }}">Log out</a>{% endif %}
     </nav>
   </header>
   <main>

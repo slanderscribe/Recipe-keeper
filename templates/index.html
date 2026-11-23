@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
+<section class="hero reveal" style="--i: 0">
+  <p class="eyebrow">Our family cookbook</p>
+  <h1>What are we <em>cooking</em> today?</h1>
   <form method="get" action="{{ url_for('index') }}" class="search">
     <input type="search" name="q" value="{{ q }}" placeholder="Search recipes, ingredients or creators">
     {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
@@ -19,16 +21,20 @@
 {% if recipes %}
 <div class="grid">
   {% for r in recipes %}
-  <a class="card recipe-card" href="{{ url_for('view_recipe', recipe_id=r.id) }}">
+  <a class="card recipe-card reveal" style="--i: {{ loop.index0 }}" href="{{ url_for('view_recipe', recipe_id=r.id) }}">
     {% set cov = cover_url(r.cover_image) %}
     <div class="cover">
-      {% if cov %}<img src="{{ cov }}" alt="" loading="lazy">{% else %}<span>🍽️</span>{% endif %}
+      {% if cov %}
+        <img src="{{ cov }}" alt="" loading="lazy" style="view-transition-name: cover-{{ r.id }}">
+      {% else %}
+        <span aria-hidden="true">🍽️</span>
+      {% endif %}
     </div>
     <div class="body">
       <h3>{{ r.title }}</h3>
       <p class="meta">
         {% if r.source_platform and r.source_platform != 'web' %}<span class="pill">{{ r.source_platform }}</span>{% endif %}
-        {% if r.source_author %}{{ r.source_author }}{% endif %}
+        {% if r.source_author %}<span>{{ r.source_author }}</span>{% endif %}
         {% if r.rating %}<span class="stars">{{ '★' * r.rating }}</span>{% endif %}
       </p>
       {% if r.tags %}
@@ -39,9 +45,9 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="card empty">
-  <h2>{{ 'No recipes match that.' if q or tag else 'Your recipe box is empty.' }}</h2>
-  <p>Paste a link from Instagram, TikTok, YouTube or a recipe site, or type one in by hand.</p>
+<div class="card empty reveal" style="--i: 0">
+  <h2>{{ 'Nothing matches that.' if q or tag else 'Your recipe box is empty.' }}</h2>
+  <p class="muted">Paste a link from Instagram, TikTok, YouTube or a recipe site, or type one in by hand.</p>
   <a class="btn" href="{{ url_for('new_recipe') }}">Add a recipe</a>
 </div>
 {% endif %}

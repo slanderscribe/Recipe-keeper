@@ -3,22 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e0533a">
   <title>Recipe Keeper · Sign in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600..800&family=Inter:wght@400..600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="login-page">
-  <main>
+  <div class="blob b1" aria-hidden="true"></div>
+  <div class="blob b2" aria-hidden="true"></div>
+  <div class="blob b3" aria-hidden="true"></div>
+  <main class="login-wrap">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for cat, msg in messages %}
         <div class="flash {{ cat }}">{{ msg }}</div>
       {% endfor %}
     {% endwith %}
-    <form method="post" class="card login-card">
-      <h1>🍳 Recipe Keeper</h1>
+    <form method="post" class="login-card reveal" style="--i: 0">
+      <div class="login-mark" aria-hidden="true">🍳</div>
+      <h1 class="display">Recipe Keeper</h1>
+      <p class="muted">Our family's recipe box</p>
       <label>Family password
         <input type="password" name="password" autofocus required>
       </label>
-      <button class="btn">Come in</button>
+      <label class="keep">
+        <input type="checkbox" name="remember" value="1" checked>
+        Keep this device signed in for a year
+      </label>
+      <button class="btn big wide">Come in</button>
     </form>
   </main>
 </body>

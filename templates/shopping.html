@@ -1,26 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Shopping list · Recipe Keeper{% endblock %}
 {% block content %}
-<h1>Shopping list</h1>
-
-<form method="post" action="{{ url_for('add_shopping_item') }}" class="inline-add">
-  <input type="text" name="name" placeholder="Add an item, e.g. 2 lemons" required>
-  <button class="btn">Add</button>
-</form>
+<section class="hero reveal" style="--i: 0">
+  <p class="eyebrow">Market run</p>
+  <h1>Shopping <em>list</em></h1>
+  <form method="post" action="{{ url_for('add_shopping_item') }}" class="inline-add" style="margin-top: 1rem">
+    <input type="text" name="name" placeholder="Add an item, e.g. 2 lemons" required>
+    <button class="btn">Add</button>
+  </form>
+</section>
 
 {% if items %}
-<ul class="shop card">
+<ul class="shop card reveal" style="--i: 1">
   {% for it in items %}
-  <li class="{{ 'done' if it.checked }}">
+  <li class="{{ 'done' if it.checked }}" style="animation-delay: {{ loop.index0 * 40 }}ms">
     <form method="post" action="{{ url_for('toggle_shopping', item_id=it.id) }}">
-      <button class="check" title="Tick off">{{ '✓' if it.checked else '○' }}</button>
+      <button class="check" title="Tick off" aria-label="Tick off">{{ '✓' if it.checked else '○' }}</button>
     </form>
     <span class="item-name">{{ it.name }}</span>
     {% if it.recipe_title %}
     <a class="from" href="{{ url_for('view_recipe', recipe_id=it.recipe_id) }}">{{ it.recipe_title }}</a>
     {% endif %}
     <form method="post" action="{{ url_for('delete_shopping', item_id=it.id) }}">
-      <button class="small danger" title="Remove">×</button>
+      <button class="small danger" title="Remove" aria-label="Remove">×</button>
     </form>
   </li>
   {% endfor %}
@@ -30,8 +32,8 @@
   <button class="btn ghost">Clear ticked items</button>
 </form>
 {% else %}
-<div class="card empty">
-  <p>Nothing on the list. Open a recipe and tap “Add checked to shopping list.”</p>
+<div class="card empty reveal" style="--i: 1">
+  <p class="muted">Nothing on the list. Open a recipe and tap “Add checked to shopping list.”</p>
 </div>
 {% endif %}
 {% endblock %}

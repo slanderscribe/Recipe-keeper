@@ -3,15 +3,17 @@
 {% block content %}
 {% set cov = cover_url(r.cover_image) %}
 <article class="recipe">
-  <header class="recipe-head">
-    {% if cov %}<img class="hero-img" src="{{ cov }}" alt="">{% endif %}
+  <header class="recipe-head reveal" style="--i: 0">
+    {% if cov %}
+      <img class="hero-img" src="{{ cov }}" alt="" style="view-transition-name: cover-{{ r.id }}">
+    {% endif %}
     <div>
       <h1>{{ r.title }}</h1>
       {% if r.description %}<p class="lede">{{ r.description }}</p>{% endif %}
       <p class="chips-row">
-        {% if r.servings %}<span class="pill">Serves {{ r.servings }}</span>{% endif %}
-        {% if r.prep_minutes %}<span class="pill">Prep {{ r.prep_minutes }} min</span>{% endif %}
-        {% if r.cook_minutes %}<span class="pill">Cook {{ r.cook_minutes }} min</span>{% endif %}
+        {% if r.servings %}<span class="pill soft">Serves {{ r.servings }}</span>{% endif %}
+        {% if r.prep_minutes %}<span class="pill soft">Prep {{ r.prep_minutes }} min</span>{% endif %}
+        {% if r.cook_minutes %}<span class="pill soft">Cook {{ r.cook_minutes }} min</span>{% endif %}
         {% for t in tags %}<span class="pill soft">#{{ t }}</span>{% endfor %}
       </p>
       <form method="post" action="{{ url_for('set_rating', recipe_id=r.id) }}" class="stars-form">
@@ -32,7 +34,7 @@
 
   {% if r.source_url %}
   {% set emb = embed_src(r.source_url) %}
-  <section class="card">
+  <section class="card reveal" style="--i: 1">
     <h2>Original post</h2>
     <p>
       <span class="pill">{{ r.source_platform or 'web' }}</span>
@@ -48,7 +50,7 @@
   {% endif %}
 
   <div class="two-col">
-    <section class="card">
+    <section class="card reveal" style="--i: 2">
       <h2>Ingredients</h2>
       {% if ingredients %}
       <form method="post" action="{{ url_for('add_to_shopping', recipe_id=r.id) }}">
@@ -64,7 +66,7 @@
       {% endif %}
     </section>
 
-    <section class="card">
+    <section class="card reveal" style="--i: 3">
       <h2>Steps</h2>
       {% if steps %}
       <ol class="steps">
@@ -77,13 +79,13 @@
   </div>
 
   {% if r.notes %}
-  <section class="card">
+  <section class="card reveal" style="--i: 4">
     <h2>Notes</h2>
     <p class="notes">{{ r.notes }}</p>
   </section>
   {% endif %}
 
-  <section class="card">
+  <section class="card reveal" style="--i: 5">
     <h2>Photos, videos & links</h2>
     {% if media %}
     <div class="gallery">
@@ -107,6 +109,7 @@
         <figure class="tile wide">
           <video controls preload="metadata" src="{{ url_for('uploaded_file', filename=m.filename) }}"></video>
           <figcaption class="tile-actions">
+            <span class="muted small">Video</span>
             <form method="post" action="{{ url_for('delete_media', media_id=m.id) }}"
                   onsubmit="return confirm('Remove this video?')">
               <button class="small danger">Remove</button>

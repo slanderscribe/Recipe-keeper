@@ -1,16 +1,16 @@
 # Recipe Keeper
 
-A family recipe box. Save recipes from links (Instagram, TikTok, YouTube, Pinterest or a recipe site), store photos and videos with each recipe, and build a shopping list from the ingredients.
+A family recipe box. Save recipes from links (Instagram, TikTok, YouTube, Pinterest or a recipe site), keep photos and videos with each recipe, and build a shopping list from the ingredients.
 
 ## What it does
 
-- **Import from a link.** Paste a post or recipe link. Recipe sites give a full recipe (ingredients and steps). Social posts give the title, caption and photo, and the original link is kept.
-- **Share from your phone (Android Chrome).** Once the app is on your home screen, use the Share menu and pick Recipe Keeper. The link opens the import screen.
+- **Import from a link.** Recipe sites give a full recipe (ingredients and steps). Social posts give the title, caption and photo, and the original link is kept. The recipe photo is copied into the app, so it doesn't break if the site changes.
+- **Share from your phone (Android Chrome).** Once the app is on your home screen, use the Share menu and pick Recipe Keeper. You can share a link, or a saved video or screenshot from TikTok or Instagram. The file becomes a new recipe that you finish in Edit. iPhone can't share files into web apps, so there, upload the video through the Videos field.
 - **Embedded posts.** YouTube, TikTok and Instagram links play inside the recipe page.
-- **Mixed media.** Each recipe can hold photos, videos and links. Choose a cover photo.
+- **Mixed media.** Each recipe can hold photos, videos and links, with a choice of cover photo.
 - **Shopping list.** Tick ingredients on a recipe and add them. Duplicates are skipped. Tick items off in the store.
-- **Search, tags and family ratings.**
-- **Backup.** The Backup link downloads a zip with every recipe (as JSON) plus all photos and videos.
+- **Stays signed in.** The sign-in page remembers the device for a year, so the password is only needed once per device.
+- **Search, tags, family ratings and a backup download** that includes every recipe, plus all photos and videos.
 
 ## Run it on your computer (optional)
 
@@ -24,38 +24,25 @@ python app.py
 
 Then open http://localhost:5000.
 
-## Put it on GitHub
-
-```
-cd C:\Users\Aaron\recipe-keeper
-git init
-git add .
-git commit -m "Initial Recipe Keeper app"
-git branch -M main
-git remote add origin https://github.com/slanderscribe/recipe-keeper.git
-git push -u origin main
-```
-
-Create the empty repo `recipe-keeper` on GitHub first.
-
 ## Deploy on Railway
 
-1. In Railway, choose **New Project → Deploy from GitHub repo** and pick `recipe-keeper`.
-2. Open the service, go to **Settings → Volumes**, add a volume, and set the mount path to `/data`. This keeps the database and photos safe across redeploys.
-3. Go to **Variables** and add:
-   - `DATA_DIR` = `/data`
-   - `APP_PASSWORD` = the family password
-   - `SECRET_KEY` = any long random text (for example, 40 random letters and numbers)
-   - `MAX_UPLOAD_MB` = `300` (optional)
-4. Go to **Settings → Networking** and generate a domain. Open it on your phone and sign in.
+The app is already deployed from GitHub. These are the settings it needs:
 
-## Adding features later
+- A volume mounted at `/data`, with `DATA_DIR=/data`.
+- `APP_PASSWORD` (family password) and `SECRET_KEY` (a long random string). Keep `SECRET_KEY` fixed. If it changes, every device has to sign in again.
+- `MAX_UPLOAD_MB` (optional, default 300).
 
-- Recipe fields live in `app.py` (`recipe_from_form`) and in `templates/recipe_form.html`.
-- Import rules for each site live in `importers.py`. Recipe sites that publish schema.org data work best.
-- Look and colors are in `static/style.css`.
+Pushing to `main` on GitHub redeploys automatically.
+
+## Where things live
+
+- Recipe fields and routes: `app.py`. Shared-file saving is `save_shared`.
+- Link import, photo copying and embed rules: `importers.py`.
+- Look, colors and motion: `static/style.css`. Tab highlight: `static/app.js`.
+- Phone share settings: `static/manifest.webmanifest`.
 
 ## Limits to know about
 
 - Instagram and TikTok often hide captions and recipe text from link previews. For those posts, paste the caption into the Ingredients and Steps boxes.
-- Photos and videos are stored on the Railway volume, so the volume should be backed up with the Backup link now and then.
+- Downloading videos straight from TikTok or Instagram isn't supported. Save the video in the app, then share it.
+- Photos and videos are stored on the Railway volume. Use the Backup link now and then.

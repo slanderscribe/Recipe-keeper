@@ -3,14 +3,20 @@
   "short_name": "Recipes",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fbf6ef",
-  "theme_color": "#c2410c",
+  "background_color": "#fbf4e9",
+  "theme_color": "#e0533a",
   "icons": [
     { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml" }
   ],
   "share_target": {
     "action": "/import",
-    "method": "GET",
-    "params": { "title": "title", "text": "text", "url": "url" }
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [ { "name": "media", "accept": ["video/*", "image/*"] } ]
+    }
   }
 }

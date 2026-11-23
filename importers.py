@@ -7,8 +7,10 @@ title, caption and photo and store the link, which the app can also embed.
 import html as htmllib
 import ipaddress
 import json
+import os
 import re
 import socket
+import uuid
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -125,6 +127,39 @@ def fetch_html(url):
         finally:
             resp.close()
     raise ImportProblem("That link redirected too many times.")
+
+
+IMAGE_TYPES = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+               "image/webp": "webp", "image/gif": "gif"}
+MAX_IMAGE_BYTES = 10_000_000
+
+
+def download_image(url, dest_dir, referer=""):
+    """Save a copy of a remote photo in dest_dir so the recipe keeps it. Returns the file name, or ''."""
+    if not is_safe_url(url):
+        return ""
+    headers = dict(HEADERS, Referer=referer) if referer else HEADERS
+    try:
+        resp = requests.get(url, headers=headers, timeout=15, allow_redirects=False, stream=True)
+    except requests.RequestException:
+        return ""
+    try:
+        if resp.status_code != 200:
+            return ""
+        ext = IMAGE_TYPES.get(resp.headers.get("Content-Type", "").split(";")[0].strip().lower())
+        if not ext:
+            return ""
+        body = bytearray()
+        for chunk in resp.iter_content(chunk_size=65536):
+            body.extend(chunk)
+            if len(body) > MAX_IMAGE_BYTES:
+                return ""
+        name = f"{uuid.uuid4().hex}.{ext}"
+        with open(os.path.join(dest_dir, name), "wb") as handle:
+            handle.write(body)
+        return name
+    finally:
+        resp.close()
 
 
 # ---------- parsing ----------
@@ -253,8 +288,11 @@ def parse_page(page_html, url):
     return draft, bool(recipe and draft["ingredients"])
 
 
-def import_from_url(url):
-    """Return (draft, message) for a link. Raises ImportProblem for links we can't use at all."""
+def import_from_url(url, dest_dir=None):
+    """Return (draft, message) for a link. Raises ImportProblem for links we can't use at all.
+
+    When dest_dir is given, the recipe photo is copied there so it doesn't depend on the source site.
+    """
     platform = detect_platform(url)
     try:
         page_html, final_url = fetch_html(url)
@@ -274,6 +312,9 @@ def import_from_url(url):
     draft, full = parse_page(page_html, final_url)
     draft["source_url"] = url
     draft["source_platform"] = platform
+    if dest_dir and draft["cover_image"].startswith(("http://", "https://")):
+        saved = download_image(draft["cover_image"], dest_dir, referer=final_url)
+        draft["cover_image"] = saved or draft["cover_image"]
 
     if full:
         message = "Found a full recipe on the page. Check the details, then save."
