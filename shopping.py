@@ -155,6 +155,37 @@ PREP_WORDS = {
 }
 STOP_WORDS = {"a", "an", "the", "of", "and", "or", "with", "into", "in", "at", "from", "for", "to", "plus",
               "such", "as", "like", "e", "g", "etc", "each", "per", "total", "or"}
+# Words that start a modifier after the ingredient name ("confectioners sugar if needed",
+# "brown sugar tightly packed", "flour for dusting"). Everything from the first one on is dropped.
+MODIFIER_STARTERS = {
+    "if", "as", "for", "to", "with", "until", "when", "plus", "optional", "divided", "needed", "desired",
+    "taste", "serving", "garnish", "dusting", "greasing", "more", "additional", "or", "at", "from", "into",
+    "about", "such", "like", "per", "each", "etc", "room", "temperature", "cold", "warm", "softened",
+    "melted", "chilled", "frozen", "thawed", "sifted", "chopped", "minced", "diced", "sliced", "beaten",
+    "packed", "spooned", "leveled", "levelled", "drained", "rinsed", "peeled", "grated", "shredded",
+    "mashed", "toasted", "crushed", "whisked", "cubed", "cooked", "uncooked", "dried", "dry",
+}
+# Ending-based modifiers ("tightly", "lightly", "finely", "dried") that are not ingredient names.
+ED_WORDS_THAT_ARE_NAMES = {"bread", "hundred"}
+LY_WORDS_THAT_ARE_NAMES = {"jelly", "belly", "curly", "family"}
+
+
+def is_modifier_word(word):
+    if word in MODIFIER_STARTERS:
+        return True
+    if len(word) >= 5 and word.endswith("ly") and word not in LY_WORDS_THAT_ARE_NAMES:
+        return True
+    if len(word) >= 5 and word.endswith("ed") and word not in ED_WORDS_THAT_ARE_NAMES:
+        return True
+    return False
+
+
+def trim_modifiers(words):
+    """Keep the ingredient name: cut the list at the first modifier that follows it."""
+    for i, word in enumerate(words):
+        if i > 0 and is_modifier_word(word):
+            return words[:i]
+    return words
 
 
 def normalize_name(text):
@@ -165,7 +196,7 @@ def normalize_name(text):
     text = re.sub(r"^\s*of\s+", "", text.strip(), flags=re.IGNORECASE)
     lowered = text.lower().replace("-", " ").replace("’", "'").replace("'", "")
     lowered = re.sub(r"[^a-z\s]", " ", lowered)
-    words = [w for w in lowered.split() if w not in PREP_WORDS and w not in STOP_WORDS
+    words = [w for w in trim_modifiers(lowered.split()) if w not in PREP_WORDS and w not in STOP_WORDS
              and w not in LABEL_WORDS and w not in COUNT_WORDS]
     words = [singular(w) for w in words]
     words = list(dict.fromkeys(words))            # "bananas banana" -> "banana"
@@ -203,7 +234,11 @@ def item_key(name):
     return PART_OF.get(name, name)
 
 
+PLURAL_DISPLAY = {"egg": "eggs"}  # items sold by the pack are shown in the plural
+
+
 def display_name(key):
+    key = PLURAL_DISPLAY.get(key, key)
     return key[:1].upper() + key[1:]
 
 
