@@ -11,7 +11,7 @@
       <h1>{{ r.title }}</h1>
       {% if r.description %}<p class="lede">{{ r.description }}</p>{% endif %}
       <p class="chips-row">
-        {% if r.category %}<a class="pill" href="{{ url_for('index', cat=r.category) }}">{{ r.category }}</a>{% endif %}
+        {% for c in r.category.split(',') if c %}<a class="pill" href="{{ url_for('index', cat=c) }}">{{ c }}</a>{% endfor %}
         {% if r.servings %}<span class="pill soft">Serves {{ r.servings }}</span>{% endif %}
         {% if r.prep_minutes %}<span class="pill soft">Prep {{ r.prep_minutes }} min</span>{% endif %}
         {% if r.cook_minutes %}<span class="pill soft">Cook {{ r.cook_minutes }} min</span>{% endif %}

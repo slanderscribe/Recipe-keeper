@@ -274,7 +274,12 @@ def parse_page(page_html, url):
         draft["ingredients"] = "\n".join(c for c in (clean_text(i) for i in ingredients) if c)
         draft["steps"] = "\n".join(flatten_steps(recipe.get("recipeInstructions")))
         draft["source_author"] = text_of(recipe.get("author"))
-        draft["category"] = text_of(recipe.get("recipeCategory"))
+        # Auto-sorting attaches only the first two categories a recipe site lists.
+        raw = recipe.get("recipeCategory") or []
+        if isinstance(raw, str):
+            raw = raw.split(",")
+        names = [clean_text(part) for part in raw if clean_text(part)]
+        draft["category"] = ",".join(names[:2])
         image = first_image(recipe.get("image"))
         draft["cover_image"] = urljoin(url, image) if image else ""
 

@@ -97,6 +97,154 @@
   });
 })();
 
+// Category boxes: each category becomes its own removable chip. Press Enter or comma to attach.
+(function () {
+  document.querySelectorAll("[data-tokens]").forEach(function (wrap) {
+    const hidden = wrap.querySelector("input[type=hidden]");
+    const input = wrap.querySelector("[data-token-input]");
+    const list = wrap.querySelector(".token-list");
+    const box = wrap.querySelector(".suggest");
+    const form = wrap.closest("form");
+    let values = (hidden.value || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+    let items = [];
+    let active = -1;
+    let timer = null;
+
+    function sync() { hidden.value = values.join(","); }
+    function has(name) { return values.some(function (v) { return v.toLowerCase() === name.toLowerCase(); }); }
+    function hide() { box.hidden = true; active = -1; }
+
+    function chipFor(name) {
+      return Array.from(list.querySelectorAll(".token")).find(function (chip) {
+        return chip.dataset.name.toLowerCase() === name.toLowerCase();
+      });
+    }
+
+    function addChip(name, animate) {
+      const chip = document.createElement("span");
+      chip.className = "token" + (animate ? " just-added" : "");
+      chip.dataset.name = name;
+      const label = document.createElement("span");
+      label.textContent = name;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.setAttribute("aria-label", "Remove " + name);
+      remove.textContent = "×";
+      remove.addEventListener("click", function () {
+        values = values.filter(function (v) { return v !== name; });
+        chip.remove();
+        sync();
+        input.focus();
+      });
+      chip.append(label, remove);
+      list.appendChild(chip);
+    }
+
+    function attach(raw) {
+      const name = raw.replace(/,/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+      if (!name) return false;
+      if (has(name)) {
+        // Already attached: replay the highlight so you can see it.
+        const existing = chipFor(name);
+        if (existing) {
+          existing.classList.remove("just-added");
+          void existing.offsetWidth;
+          existing.classList.add("just-added");
+        }
+        return false;
+      }
+      values.push(name);
+      addChip(name, true);
+      sync();
+      return true;
+    }
+
+    function choose(i) {
+      attach(items[i].value);
+      input.value = "";
+      hide();
+      input.focus();
+    }
+
+    function render(list2) {
+      const typed = input.value.trim();
+      const options = [];
+      if (typed && !has(typed)) options.push({ label: "Add “" + typed + "”", value: typed });
+      list2.forEach(function (s) {
+        if (!has(s) && !options.some(function (o) { return o.value.toLowerCase() === s.toLowerCase(); })) {
+          options.push({ label: s, value: s });
+        }
+      });
+      box.innerHTML = "";
+      items = options.slice(0, 8);
+      active = -1;
+      if (!items.length) return hide();
+      items.forEach(function (item, i) {
+        const li = document.createElement("li");
+        li.textContent = item.label;
+        li.setAttribute("role", "option");
+        li.addEventListener("mousedown", function (e) { e.preventDefault(); choose(i); });
+        box.appendChild(li);
+      });
+      box.hidden = false;
+    }
+
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      const typed = input.value.trim();
+      if (!typed) return render([]);
+      timer = setTimeout(function () {
+        const url = new URL(wrap.dataset.suggest, window.location.origin);
+        url.searchParams.set("kind", "category");
+        url.searchParams.set("q", typed);
+        fetch(url).then(function (r) { return r.json(); }).then(render).catch(function () { render([]); });
+      }, 120);
+    });
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        if (!box.hidden && active >= 0) return choose(active);
+        if (attach(input.value)) input.value = "";
+        else input.value = "";
+        hide();
+      } else if (e.key === "Backspace" && !input.value) {
+        const last = list.lastElementChild;
+        if (last) {
+          values = values.filter(function (v) { return v !== last.dataset.name; });
+          last.remove();
+          sync();
+        }
+      } else if (!box.hidden && items.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        active = (active + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        Array.from(box.children).forEach(function (li, i) { li.classList.toggle("is-active", i === active); });
+        e.preventDefault();
+      } else if (e.key === "Escape") {
+        hide();
+      }
+    });
+
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        if (input.value.trim()) attach(input.value);
+        input.value = "";
+        hide();
+      }, 150);
+    });
+
+    if (form) {
+      form.addEventListener("submit", function () {
+        if (input.value.trim()) attach(input.value);
+        input.value = "";
+        sync();
+      });
+    }
+
+    values.forEach(function (name) { addChip(name, false); });
+    sync();
+  });
+})();
+
 // Recipe text size (A− / A+), remembered on this device.
 (function () {
   const KEY = "rk-text-scale";

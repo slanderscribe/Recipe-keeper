@@ -312,6 +312,41 @@ input[type="file"] { font-weight: 400; }
 .step-done:checked ~ .step-text { text-decoration: line-through; color: var(--muted); }
 .step-done:checked ~ .step-num { color: var(--muted); }
 .suggest-wrap { display: block; position: relative; }
+
+/* category chips: each category is a boxed, removable item */
+.field { margin-bottom: 1rem; }
+.field-label { display: block; font-weight: 600; margin-bottom: .3rem; }
+.tokens {
+  position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+  padding: .45rem .5rem; border: 1px solid var(--line); border-radius: 14px; background: var(--paper);
+  transition: border-color .2s, box-shadow .2s;
+}
+.tokens:focus-within { border-color: var(--tomato); box-shadow: 0 0 0 4px rgba(224, 83, 58, .15); }
+.token-list { display: contents; }
+.token {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .25rem .3rem .25rem .75rem; border-radius: 999px;
+  border: 1.5px solid var(--tomato); background: var(--blush); color: var(--tomato-deep);
+  font-weight: 700; font-size: .9rem;
+}
+.token.just-added { animation: pop .4s var(--ease) both; }
+.token button {
+  border: 0; border-radius: 50%; width: 1.5rem; height: 1.5rem; cursor: pointer;
+  background: rgba(42, 31, 23, .08); color: inherit; font: inherit; font-size: 1rem; line-height: 1;
+}
+.token button:hover { background: rgba(42, 31, 23, .18); }
+.token-input {
+  flex: 1 1 160px; min-width: 150px; width: auto; margin: 0 !important;
+  padding: .3rem .2rem !important; border: 0 !important; background: transparent !important; box-shadow: none !important;
+}
+.token-input:focus { outline: none; }
+.tokens .suggest { top: calc(100% + 6px); }
+.pill-row { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0 0 .35rem; }
+@keyframes pop {
+  0% { transform: scale(.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
 .notes { white-space: pre-line; margin: 0; }
 .gallery { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .tile {

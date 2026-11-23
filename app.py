@@ -159,11 +159,8 @@ def cover_url(value):
 def template_helpers():
     count = get_db().execute(
         "SELECT COUNT(*) FROM shopping_items WHERE checked = 0").fetchone()[0]
-    names = {c.lower(): c for c in DEFAULT_CATEGORIES}
-    for row in get_db().execute("SELECT DISTINCT category FROM recipes WHERE category != ''"):
-        names.setdefault(row[0].lower(), row[0])
     return {
-        "category_options": sorted(names.values()),
+        "category_options": sorted(all_category_names().values()),
         "shopping_count": count,
         "logged_in": bool(APP_PASSWORD),
         "embed_src": embed_src,
@@ -199,7 +196,7 @@ def recipe_from_form(form):
         "source_author": form.get("source_author", "").strip(),
         "source_platform": detect_platform(source_url) if source_url else "",
         "cover_image": form.get("cover_image", "").strip(),
-        "category": canonical_category(form.get("category", "")),
+        "category": ",".join(dict.fromkeys(canonical_category(c) for c in split_categories(form.get("category", "")))),
     }
 
 
@@ -306,6 +303,20 @@ def too_large(_err):
 UNCATEGORIZED = "Uncategorized"
 
 
+def split_categories(value):
+    """A recipe can have several categories, stored as 'Dessert,Holiday'."""
+    return [part.strip() for part in (value or "").split(",") if part.strip()]
+
+
+def all_category_names():
+    """Every category name in use, keyed by lowercase, with default names first."""
+    names = {c.lower(): c for c in DEFAULT_CATEGORIES}
+    for row in get_db().execute("SELECT category FROM recipes WHERE category != ''"):
+        for name in split_categories(row[0]):
+            names.setdefault(name.lower(), name)
+    return names
+
+
 @app.route("/")
 def index():
     q = request.args.get("q", "").strip()
@@ -318,13 +329,13 @@ def index():
     display, counts, uncategorized, tag_set = {}, {}, 0, set()
     for row in all_rows:
         tag_set.update(t for t in row["tags"].split(",") if t)
-        name = row["category"].strip()
-        if not name:
+        names = split_categories(row["category"])
+        if not names:
             uncategorized += 1
-            continue
-        key = name.lower()
-        display.setdefault(key, name)
-        counts[key] = counts.get(key, 0) + 1
+        for name in dict.fromkeys(names):
+            key = name.lower()
+            display.setdefault(key, name)
+            counts[key] = counts.get(key, 0) + 1
     defaults = {c.lower(): c for c in DEFAULT_CATEGORIES}
     for key, name in defaults.items():
         display.setdefault(key, name)
@@ -342,8 +353,8 @@ def index():
     if cat == UNCATEGORIZED:
         sql += " AND TRIM(category) = ''"
     elif cat:
-        sql += " AND lower(category) = lower(?)"
-        params.append(cat)
+        sql += " AND (',' || lower(category) || ',') LIKE ?"
+        params.append(f"%,{cat.lower()},%")
     if tag:
         sql += " AND (',' || tags || ',') LIKE ?"
         params.append(f"%,{tag},%")
@@ -361,10 +372,8 @@ def suggest():
         return jsonify([])
     db = get_db()
     if request.args.get("kind") == "category":
-        # Category box on the recipe form: only category names, alphabetical.
-        names = {c.lower(): c for c in DEFAULT_CATEGORIES}
-        for row in db.execute("SELECT DISTINCT category FROM recipes WHERE category != ''"):
-            names.setdefault(row[0].lower(), row[0])
+        # Category boxes on the recipe form: only category names, alphabetical.
+        names = all_category_names()
         matches = [name for name in names.values()
                    if name.lower().startswith(q) or any(w.startswith(q) for w in name.lower().split())]
         return jsonify(sorted(matches, key=str.lower)[:8])

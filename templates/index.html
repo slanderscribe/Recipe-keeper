@@ -45,7 +45,7 @@
       {% endif %}
     </div>
     <div class="body">
-      {% if r.category %}<span class="pill">{{ r.category }}</span>{% endif %}
+      {% if r.category %}<p class="pill-row">{% for c in r.category.split(',') if c %}<span class="pill">{{ c }}</span>{% endfor %}</p>{% endif %}
       <h3>{{ r.title }}</h3>
       <p class="meta">
         {% if r.source_platform and r.source_platform != 'web' %}<span class="pill soft">{{ r.source_platform }}</span>{% endif %}
