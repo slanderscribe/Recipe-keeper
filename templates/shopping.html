@@ -31,6 +31,10 @@
       onsubmit="return confirm('Remove everything that is ticked off?')">
   <button class="btn ghost">Clear ticked items</button>
 </form>
+<form method="post" action="{{ url_for('clear_all') }}" class="clear-row"
+      onsubmit="return confirm('Remove every item from the shopping list?')">
+  <button class="btn ghost danger">Clear all</button>
+</form>
 {% else %}
 <div class="card empty reveal" style="--i: 1">
   <p class="muted">Nothing on the list. Open a recipe and tap “Add checked to shopping list.”</p>

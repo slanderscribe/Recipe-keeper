@@ -675,6 +675,14 @@ def clear_checked():
     return redirect(url_for("shopping"))
 
 
+@app.route("/shopping/clear-all", methods=["POST"])
+def clear_all():
+    db = get_db()
+    db.execute("DELETE FROM shopping_items")
+    db.commit()
+    return redirect(url_for("shopping"))
+
+
 # ---------- backup ----------
 
 @app.route("/export.zip")
