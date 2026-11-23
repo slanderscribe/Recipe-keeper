@@ -291,3 +291,25 @@
     });
   });
 })();
+
+// Share a recipe as plain text through the phone's own share sheet (Messages, email, notes...).
+// Browsers without a share sheet copy the text to the clipboard instead.
+document.querySelectorAll("[data-share]").forEach(function (button) {
+  const label = button.textContent;
+  function flash(text) {
+    button.textContent = text;
+    setTimeout(function () { button.textContent = label; }, 1800);
+  }
+  button.addEventListener("click", function () {
+    fetch(button.dataset.shareUrl, { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error("bad"); return r.text(); })
+      .then(function (text) {
+        if (navigator.share) {
+          return navigator.share({ title: button.dataset.shareTitle, text: text })
+            .catch(function (err) { if (err && err.name !== "AbortError") throw err; });
+        }
+        return navigator.clipboard.writeText(text).then(function () { flash("Copied"); });
+      })
+      .catch(function () { flash("Couldn't share"); });
+  });
+});

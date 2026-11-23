@@ -10,7 +10,7 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
 
-from flask import (Flask, abort, flash, g, redirect, render_template, request,
+from flask import (Flask, Response, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
 from capture import MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
@@ -509,6 +509,41 @@ def capture():
     flash(f"Read {count} page{'s' if count != 1 else ''}. Check the text against the scan and fix "
           "anything the reader got wrong, then save.", "ok")
     return redirect(url_for("edit_recipe", recipe_id=recipe_id))
+
+
+def build_share_text(row):
+    """One plain-text page for a recipe: pastes cleanly into messages, email and notes."""
+    lines = [row["title"]]
+    facts = []
+    if row["servings"]:
+        facts.append(f"Serves {row['servings']}")
+    if row["prep_minutes"]:
+        facts.append(f"Prep {row['prep_minutes']} min")
+    if row["cook_minutes"]:
+        facts.append(f"Cook {row['cook_minutes']} min")
+    if facts:
+        lines.append(" | ".join(facts))
+    if row["description"]:
+        lines += ["", row["description"]]
+    ingredients = split_lines(row["ingredients"])
+    if ingredients:
+        lines += ["", "Ingredients"] + [f"- {item}" for item in ingredients]
+    steps = split_lines(row["steps"])
+    if steps:
+        lines += ["", "Steps"] + [f"{n}. {step}" for n, step in enumerate(steps, 1)]
+    if row["notes"]:
+        lines += ["", "Notes", row["notes"]]
+    if row["source_url"]:
+        lines += ["", f"Original: {row['source_url']}"]
+    return "\n".join(lines) + "\n"
+
+
+@app.route("/recipes/<int:recipe_id>/share.txt")
+def share_text(recipe_id):
+    row = get_db().execute("SELECT * FROM recipes WHERE id=?", (recipe_id,)).fetchone()
+    if not row:
+        abort(404)
+    return Response(build_share_text(row), mimetype="text/plain; charset=utf-8")
 
 
 @app.route("/recipes/<int:recipe_id>")

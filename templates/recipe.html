@@ -24,6 +24,7 @@
         {% endfor %}
       </form>
       <p class="actions">
+        <button type="button" class="btn ghost" data-share data-share-url="{{ url_for('share_text', recipe_id=r.id) }}" data-share-title="{{ r.title }}">Share</button>
         <a class="btn ghost" href="{{ url_for('edit_recipe', recipe_id=r.id) }}">Edit</a>
         <form method="post" action="{{ url_for('delete_recipe', recipe_id=r.id) }}" class="inline"
               onsubmit="return confirm('Delete this recipe and all its photos and videos?')">
