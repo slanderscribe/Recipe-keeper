@@ -166,7 +166,7 @@ MODIFIER_STARTERS = {
     "mashed", "toasted", "crushed", "whisked", "cubed", "cooked", "uncooked", "dried",
 }
 # Ending-based modifiers ("tightly", "lightly", "finely", "dried") that are not ingredient names.
-ED_WORDS_THAT_ARE_NAMES = {"bread", "hundred"}
+ED_WORDS_THAT_ARE_NAMES = {"bread", "hundred", "condensed"}
 LY_WORDS_THAT_ARE_NAMES = {"jelly", "belly", "curly", "family"}
 
 
@@ -513,13 +513,23 @@ VARIANT_ALIASES = {
     "angel hair": "angel hair pasta", "lasagna noodle": "lasagna noodle", "egg noodle": "egg noodle",
     "unsalted butter": "unsalted butter", "salted butter": "salted butter",
     "clove": "ground cloves", "ground clove": "ground cloves", "ground cloves": "ground cloves",
+    "evaporated milk": "evaporated milk", "evap milk": "evaporated milk",
+    "sweetened condensed milk": "sweetened condensed milk", "condensed milk": "sweetened condensed milk",
+    "cond milk": "sweetened condensed milk",
+}
+# Standard US can sizes. A line like "1 can (12 oz.) evaporated milk" buys one 12 oz can.
+CANNED_SPECS = {
+    "evaporated milk": {"packs": [(341, "12 oz can")]},
+    "sweetened condensed milk": {"packs": [(397, "14 oz can")]},
 }
 _FLOUR_SPEC = PACKAGES["flour"]
 _BUTTER_SPEC = PACKAGES["butter"]
 _YEAST_SPEC = {"packs": [(7, "0.25 oz packet"), (113, "4 oz jar")]}
 _PASTA_SPEC = {"packs": [(454, "1 lb box")]}
 for _name in VARIANT_ALIASES.values():
-    if _name.endswith("flour"):
+    if _name in CANNED_SPECS:
+        PACKAGES[_name] = CANNED_SPECS[_name]
+    elif _name.endswith("flour"):
         PACKAGES[_name] = _FLOUR_SPEC
     elif _name.endswith("butter"):
         PACKAGES[_name] = _BUTTER_SPEC

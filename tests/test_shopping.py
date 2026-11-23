@@ -156,6 +156,23 @@ def test_part_lines_are_removed_when_rebuilding():
     assert items(conn) == [("All-purpose flour", 0)]
 
 
+@pytest.mark.parametrize("line, name", [
+    ("1 can (12 oz.) evap. milk", "Evaporated milk"),
+    ("1 can (12 oz.) evaporated milk", "Evaporated milk"),
+    ("1 can (14 oz.) sweetened condensed milk", "Sweetened condensed milk"),
+])
+def test_canned_goods_are_known(line, name):
+    parsed = parse_ingredient(line)
+    assert parsed["name"] == name
+    assert parsed["known"] is True
+
+
+def test_two_can_lines_buy_two_cans():
+    from shopping import purchase_text
+    lines = [parse_ingredient("1 can (12 oz.) evap. milk"), parse_ingredient("1 can (12 oz.) evaporated milk")]
+    assert purchase_text("evaporated milk", lines) == "2 × 12 oz can"
+
+
 def test_known_name_lookup():
     assert is_known_name("Eggs")
     assert is_known_name("Confectioners sugar")
