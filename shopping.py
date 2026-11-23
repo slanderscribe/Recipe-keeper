@@ -35,6 +35,7 @@ PACKAGES = {
     "cream cheese": {"packs": [(227, "8 oz package"), (454, "16 oz (2 packages)")]},
     "sour cream": {"packs": [(454, "16 oz tub")]},
     "banana": {"each": True, "packs": [(5, "bunch (about 5)")]},
+    "garlic": {"each": True, "packs": [(10, "head (about 10 cloves)")]},
     "lemon": {"each": True, "packs": [(1, "lemon")]},
 }
 
@@ -168,11 +169,20 @@ def singular(word):
     return word
 
 
+# A part of something rolls up into the whole: an egg yolk is part of an egg, a garlic clove is part
+# of garlic, a vanilla bean is part of vanilla. Parts are added to the whole's count or amount.
+PART_OF = {
+    "egg yolk": "egg", "egg yolks": "egg", "egg white": "egg", "egg whites": "egg",
+    "garlic clove": "garlic", "garlic cloves": "garlic", "garlic": "garlic",
+    "vanilla bean": "vanilla extract", "vanilla beans": "vanilla extract", "vanilla pod": "vanilla extract",
+}
+
+
 def item_key(name):
     for pattern, key in SYNONYMS:
         if re.match(pattern, name):
-            return key
-    return name
+            return PART_OF.get(key, key)
+    return PART_OF.get(name, name)
 
 
 def display_name(key):
@@ -275,14 +285,16 @@ def parse_ingredient(line):
     elif sticks and spec.get("stick_g"):
             grams = sum(v for v, _, _, _ in sticks) * spec["stick_g"]
     if spec.get("each"):
-        if bare_value is not None and not measures:
+        if bare_value is not None and not volumes and not weights:
             count = bare_value
-        elif bare_value is not None and not volumes and not weights:
-            count = bare_value
+        if counts and not volumes and not weights:
+            count = sum(v for v, _, _, _ in counts)
         grams = None
     amount_bits = [f"{format_amount(v)} {label}" for v, _, _, label in measures]
     if bare_value is not None and not measures:
-        amount_bits = [format_amount(bare_value)]
+        # A part keeps its own name in the amount, e.g. "2 egg yolks" rolls up into Egg.
+        part = name if name in PART_OF else ""
+        amount_bits = [" ".join(p for p in (format_amount(bare_value), part) if p)]
     if weights and volumes:
         amount_bits = [b for b, m in zip(amount_bits, measures) if m[1] != "volume"] or amount_bits
     return {
