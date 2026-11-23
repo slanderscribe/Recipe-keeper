@@ -29,6 +29,13 @@ PACKAGES = {
     "coconut": {"per_cup": 85, "packs": [(340, "12 oz bag")]},
     "chocolate chips": {"per_cup": 170, "packs": [(340, "12 oz bag")]},
     "cornstarch": {"per_cup": 120, "packs": [(340, "12 oz box")]},
+    "confectioners sugar": {"per_cup": 120, "packs": [(454, "1 lb bag"), (907, "2 lb bag")]},
+    "baking powder": {"per_cup": 192, "packs": [(227, "8 oz can"), (454, "16 oz can")]},
+    "buttermilk": {"packs": [(946, "quart"), (1893, "half gallon")]},
+    "cream cheese": {"packs": [(227, "8 oz package"), (454, "16 oz (2 packages)")]},
+    "sour cream": {"packs": [(454, "16 oz tub")]},
+    "banana": {"each": True, "packs": [(5, "bunch (about 5)")]},
+    "lemon": {"each": True, "packs": [(1, "lemon")]},
 }
 
 # Other names for the same thing, so "all-purpose flour" and "flour" share one item.
@@ -52,6 +59,11 @@ SYNONYMS = [
     (r"^(semi[- ]sweet |mini )?chocolate chips?$", "chocolate chips"),
     (r"^(corn ?starch)$", "cornstarch"),
     (r"^honey$", "honey"),
+    (r"^(confectioners?|powdered|icing|10x) sugar$", "confectioners sugar"),
+    (r"^baking powder$", "baking powder"),
+    (r"^(full[- ]fat |brick |block |regular )*cream cheese$", "cream cheese"),
+    (r"^(sour cream)$", "sour cream"),
+    (r"^buttermilk$", "buttermilk"),
 ]
 
 # Words that describe an ingredient but are not part of what you buy.
@@ -59,7 +71,12 @@ DESCRIPTORS = [
     "large", "medium", "small", "extra large", "fresh", "freshly", "chopped", "minced", "diced",
     "sliced", "sifted", "softened", "melted", "room temperature", "cold", "divided", "packed",
     "finely", "coarsely", "beaten", "optional", "to taste", "or as needed", "as needed", "at room temperature",
+    "heaping", "scant", "generous", "level", "full", "about", "ripe", "whole", "plain", "softened",
+    "stiff", "warm", "lukewarm", "thawed", "drained", "rinsed", "peeled", "grated", "shredded",
+    "mashed", "full fat", "brick", "block", "amount", "pinch of", "handful",
 ]
+FILLER_WORDS = {"a", "an", "and", "or", "of", "about", "some", "few", "heaping", "scant", "generous", "level"}
+UNCOUNTABLE_SINGULAR = {"molasses", "grits", "oats", "greens", "series", "news"}
 
 UNIT_MAP = {
     # volume, in ml
@@ -91,7 +108,7 @@ def parse_quantity(text):
     """Read a leading amount like '2', '1/2', '1 1/2' or '½'. Returns (value, rest)."""
     for char, frac in FRACTION_CHARS.items():
         text = text.replace(char, frac if text.startswith(char) else f" {frac}")
-    match = re.match(r"^\s*(\d+)\s+(\d+/\d+)\b\s*", text)
+    match = re.match(r"^\s*(\d+)\s*(?:and\s+)?(\d+/\d+)\b\s*", text, re.IGNORECASE)
     if match:
         value = float(int(match.group(1)) + Fraction(match.group(2)))
         return value, text[match.end():]
@@ -126,11 +143,29 @@ def normalize_name(text):
     text = re.sub(r"\(.*?\)", " ", text)
     text = text.split(",")[0]
     text = re.sub(r"^\s*of\s+", "", text.strip(), flags=re.IGNORECASE)
-    lowered = text.lower()
+    lowered = text.lower().replace("-", " ").replace("’", "'").replace("'", "")
     for word in sorted(DESCRIPTORS, key=len, reverse=True):
         lowered = re.sub(r"\b" + re.escape(word) + r"\b", " ", lowered)
     lowered = re.sub(r"[^a-z\s\-\.]", " ", lowered)
-    return re.sub(r"\s+", " ", lowered).strip(" .-")
+    words = [w for w in re.sub(r"\s+", " ", lowered).strip(" .-").split(" ") if w and w not in FILLER_WORDS]
+    if words:
+        words[-1] = singular(words[-1])
+    return " ".join(words)
+
+
+def singular(word):
+    """Simple plural to singular: bananas -> banana, berries -> berry, cloves -> clove."""
+    if word in UNCOUNTABLE_SINGULAR or len(word) <= 3:
+        return word
+    if word.endswith("ies"):
+        return word[:-3] + "y"
+    if word.endswith(("ss", "us", "is")):
+        return word
+    if word.endswith("oes"):
+        return word[:-2]
+    if word.endswith("s"):
+        return word[:-1]
+    return word
 
 
 def item_key(name):
@@ -156,8 +191,9 @@ def parse_ingredient(line):
     count = None
     if value is not None and key in PACKAGES:
         spec = PACKAGES[key]
-        if spec.get("each") and unit is None:
-            count = value
+        if spec.get("each"):
+            # Counted items (eggs, bananas) only convert from a plain count, never from cups or weight.
+            count = value if unit is None else None
         elif unit is not None and unit in UNIT_MAP:
             base, factor = UNIT_MAP[unit]
             if base == "stick":
@@ -216,19 +252,51 @@ def purchase_text(key, lines):
     return choose_package(key, grams, count)
 
 
+PLURAL_UNITS = {"cup", "can", "clove", "stick", "package", "bag", "jar"}
+
+
+def canonical_unit(unit):
+    """'cups' and 'c.' are the same unit when adding amounts together."""
+    unit = (unit or "").strip().lower().rstrip(".")
+    if unit in ("c", "cup", "cups"):
+        return "cup"
+    if unit in ("tbsp", "tbsps", "tablespoon", "tablespoons", "t", "tbs"):
+        return "tbsp"
+    if unit in ("tsp", "tsps", "teaspoon", "teaspoons"):
+        return "tsp"
+    if unit in ("oz", "ounce", "ounces"):
+        return "oz"
+    if unit in ("lb", "lbs", "pound", "pounds"):
+        return "lb"
+    if unit in ("g", "gram", "grams"):
+        return "g"
+    if unit in ("can", "cans"):
+        return "can"
+    if unit in ("clove", "cloves"):
+        return "clove"
+    if unit in ("stick", "sticks"):
+        return "stick"
+    return unit
+
+
 def combined_amounts(name, lines):
-    """For items with no package rule: add up the amounts the recipes call for."""
+    """What the recipes call for. Same units are added together; different units are listed."""
     totals, order, loose = {}, [], []
     for line in lines:
         value, rest = parse_quantity(line["amount"] or "")
         if value is None:
             loose.append(line["text"])
             continue
-        unit = rest.strip()
+        unit = canonical_unit(rest)
         if unit not in totals:
             totals[unit] = 0
             order.append(unit)
         totals[unit] += value
-    parts = [" ".join(p for p in (format_amount(totals[u]), u, name.lower()) if p) for u in order]
-    parts += list(dict.fromkeys(loose))
-    return ("Total: " if order else "") + "; ".join(parts)
+    groups = []
+    for u in order:
+        total = totals[u]
+        label = u + "s" if total != 1 and u in PLURAL_UNITS else u
+        groups.append(" ".join(p for p in (format_amount(total), label) if p))
+    if len(order) == 1 and not loose:
+        return groups[0]
+    return " + ".join(groups + list(dict.fromkeys(loose)))

@@ -719,9 +719,10 @@ def shopping_rows():
             if not detail:
                 # No package rule for this ingredient: list what the recipes call for.
                 detail = combined_amounts(it["name"], lines)
-            sources = list(dict.fromkeys(l["recipe_title"] for l in lines if l["recipe_title"]))
-        elif it["recipe_title"]:
-            sources = [it["recipe_title"]]
+            sources = list(dict.fromkeys(
+                (l["recipe_id"], l["recipe_title"]) for l in lines if l["recipe_id"]))
+        elif it["recipe_id"]:
+            sources = [(it["recipe_id"], it["recipe_title"] or "Recipe")]
         rows.append({"id": it["id"], "name": it["name"], "checked": it["checked"],
                      "detail": detail, "sources": sources})
     return rows

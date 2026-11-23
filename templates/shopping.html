@@ -18,8 +18,17 @@
       <button class="check" title="Tick off" aria-label="Tick off">{{ '✓' if it.checked else '○' }}</button>
     </form>
     <span class="item-name">{{ it.name }}</span>
-    {% if it.detail %}<span class="muted small item-detail">{{ it.detail }}</span>{% endif %}
-    {% for title in it.sources %}<span class="from">{{ title }}</span>{% endfor %}
+    {% if it.detail %}<span class="item-detail">{{ it.detail }}</span>{% endif %}
+    {% if it.sources %}
+    <details class="src">
+      <summary class="src-count" aria-label="Recipes this comes from">{{ it.sources|length }}</summary>
+      <ul class="src-list">
+        {% for rid, title in it.sources %}
+        <li><a href="{{ url_for('view_recipe', recipe_id=rid) }}">{{ title }}</a></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
     <form method="post" action="{{ url_for('delete_shopping', item_id=it.id) }}">
       <button class="small danger" title="Remove" aria-label="Remove">×</button>
     </form>

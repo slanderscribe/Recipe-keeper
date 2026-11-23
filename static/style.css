@@ -73,7 +73,7 @@ h3 { font-size: 1.15rem; }
 
 /* top bar and tabs */
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: sticky; top: 0; z-index: 60;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: .6rem 1rem; padding: .7rem 1.25rem;
   background: rgba(255, 253, 248, .78);
@@ -382,8 +382,22 @@ input[type="file"] { font-weight: 400; }
 .shop li.done .check { background: var(--olive); color: #fff; }
 .shop li.done .item-name { text-decoration: line-through; color: var(--muted); transition: color .3s; }
 .item-name { flex: 1; font-weight: 500; }
-.from { font-size: .85rem; color: var(--muted); text-decoration: none; }
-.from:hover { text-decoration: underline; }
+.item-detail { font-size: .85rem; color: var(--muted); max-width: 46%; text-align: right; }
+/* recipe count on each shopping item: tap to open the list, tap a recipe to go to it */
+.src { position: relative; }
+.src-count {
+  display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding: 0 .4rem;
+  border-radius: 999px; background: var(--butter); color: var(--ink); font-size: .8rem; font-weight: 700;
+  cursor: pointer; list-style: none;
+}
+.src-count::-webkit-details-marker { display: none; }
+.src-list {
+  position: absolute; right: 0; top: 2rem; z-index: 30; min-width: 14rem; max-width: 16rem;
+  margin: 0; padding: .5rem .4rem; list-style: none; background: var(--paper);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px rgba(60,30,10,.18);
+}
+.src-list li a { display: block; padding: .4rem .5rem; border-radius: 8px; color: var(--ink); text-decoration: none; }
+.src-list li a:hover { background: #fff6ec; color: var(--tomato-deep); }
 .clear-row { margin-top: 1rem; }
 
 /* sign-in page */
