@@ -35,6 +35,9 @@
   </li>
   {% endfor %}
 </ul>
+<p class="clear-row">
+  <button type="button" class="btn" data-share data-share-url="{{ url_for('shopping_share') }}" data-share-title="Shopping list">Share list</button>
+</p>
 <form method="post" action="{{ url_for('clear_checked') }}" class="clear-row"
       onsubmit="return confirm('Remove everything that is ticked off?')">
   <button class="btn ghost">Clear ticked items</button>

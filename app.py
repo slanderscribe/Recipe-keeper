@@ -728,6 +728,27 @@ def shopping_rows():
     return rows
 
 
+def shopping_share_text(rows):
+    """One item per line, for pasting into a text message (Walmart Text to Shop) or any app."""
+    lines = []
+    for row in rows:
+        if row["checked"]:
+            continue
+        detail = row["detail"] or ""
+        # "1 × 1 lb bag" -> "1 lb bag"; "2 × dozen" -> "2 dozen"
+        detail = re.sub(r"^1 × ", "", detail)
+        detail = re.sub(r"^(\d+) × ", r"\1 ", detail)
+        if detail.startswith("Recipes call for") or detail.lower().startswith(row["name"].lower()):
+            detail = ""
+        lines.append(f"{row['name']}, {detail}" if detail else row["name"])
+    return "\n".join(lines) + "\n"
+
+
+@app.route("/shopping/share.txt")
+def shopping_share():
+    return Response(shopping_share_text(shopping_rows()), mimetype="text/plain; charset=utf-8")
+
+
 @app.route("/shopping")
 def shopping():
     return render_template("shopping.html", items=shopping_rows())
