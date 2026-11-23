@@ -13,8 +13,8 @@ from datetime import datetime, timedelta, timezone
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
-from shopping import (combined_amounts, is_known_name, item_key, parse_ingredient, parse_quantity,
-                      purchase_text, rebuild_items)
+from shopping import (combined_amounts, is_known_name, item_key, load_learned,
+                      parse_ingredient, parse_quantity, purchase_text, rebuild_items)
 from capture import CAPTURE_EXTS, MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
@@ -82,6 +82,10 @@ CREATE TABLE IF NOT EXISTS shopping_items (
     created_at TEXT NOT NULL
 );
 -- One line per recipe ingredient that feeds a shopping item (several recipes can share one item).
+CREATE TABLE IF NOT EXISTS learned_ingredients (
+    key TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS shopping_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id INTEGER NOT NULL REFERENCES shopping_items(id) ON DELETE CASCADE,
@@ -140,6 +144,7 @@ def get_db():
         g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
+        load_learned(g.db)
     return g.db
 
 
@@ -785,6 +790,22 @@ def add_shopping_item():
                    (name, now()))
         rebuild_items(db)
         db.commit()
+    return redirect(url_for("shopping"))
+
+
+@app.route("/shopping/<int:item_id>/approve", methods=["POST"])
+def approve_shopping(item_id):
+    """Save an item's name from 'Check these' as a known ingredient, so it is accepted from now on."""
+    db = get_db()
+    row = db.execute("SELECT name FROM shopping_items WHERE id=?", (item_id,)).fetchone()
+    if row:
+        key = item_key(row["name"].lower())
+        if key:
+            db.execute("INSERT OR IGNORE INTO learned_ingredients (key, created_at) VALUES (?, ?)", (key, now()))
+            db.commit()
+            load_learned(db)
+            refresh_shopping()
+            flash(f"Saved “{row['name']}” to the list.", "ok")
     return redirect(url_for("shopping"))
 
 

@@ -559,8 +559,17 @@ def is_part_line(original, key, has_amount):
 KNOWN_INGREDIENTS -= {"pasta", "noodle", "yeast", "flour"}
 
 
+# Names the user has approved from "Check these". Loaded from the database.
+LEARNED_INGREDIENTS = set()
+
+
+def load_learned(conn):
+    LEARNED_INGREDIENTS.clear()
+    LEARNED_INGREDIENTS.update(r[0] for r in conn.execute("SELECT key FROM learned_ingredients"))
+
+
 def is_known_key(key):
-    return bool(key) and key in KNOWN_INGREDIENTS
+    return bool(key) and (key in KNOWN_INGREDIENTS or key in LEARNED_INGREDIENTS)
 
 
 def is_known_name(name):

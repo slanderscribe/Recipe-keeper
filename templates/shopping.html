@@ -35,10 +35,21 @@
 {% if check_items %}
 <section class="card reveal" style="--i: 1; margin-bottom: 1rem">
   <h2 style="margin-top: 0">Check these</h2>
-  <p class="muted">These names were not recognised, so they are not sent to the store. Remove them, or fix the recipe line and add the recipe again.</p>
+  <p class="muted">These names were not recognised, so they are not sent to the store. Save a name to the list if it is correct, edit the recipe if it is not, or remove it.</p>
   <ul class="shop">
     {% for it in check_items %}{{ row(it) }}{% endfor %}
   </ul>
+  {% for it in check_items %}
+  <div class="check-actions" style="margin: .25rem 0 1rem">
+    <strong>{{ it.name }}</strong>
+    <form method="post" action="{{ url_for('approve_shopping', item_id=it.id) }}" style="display:inline">
+      <button class="small">Save to list</button>
+    </form>
+    {% if it.sources %}
+    <a class="small" href="{{ url_for('edit_recipe', recipe_id=it.sources[0][0]) }}">Edit recipe</a>
+    {% endif %}
+  </div>
+  {% endfor %}
 </section>
 {% endif %}
 
