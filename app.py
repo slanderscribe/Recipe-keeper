@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from flask import (Flask, Response, abort, flash, g, redirect, render_template, request,
                    send_file, send_from_directory, session, url_for, jsonify)
 
-from capture import MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
+from capture import CAPTURE_EXTS, MAX_CAPTURE_PAGES, capture_ready, claude_key, read_recipe
 from importers import (ImportProblem, detect_platform, embed_src,
                        extract_first_url, import_from_url, normalize_url)
 
@@ -484,7 +484,7 @@ def capture():
     if len(pages) > MAX_CAPTURE_PAGES:
         flash(f"Scan up to {MAX_CAPTURE_PAGES} pages at a time. Do the rest in a second batch.", "warn")
         return redirect(url_for("capture"))
-    saved = save_files(pages, IMAGE_EXTS)
+    saved = save_files(pages, CAPTURE_EXTS)
     if not saved:
         return redirect(url_for("capture"))
     try:
@@ -500,13 +500,16 @@ def capture():
     db = get_db()
     cur = db.execute(INSERT_SQL, {**data, "created_at": stamp, "updated_at": stamp})
     recipe_id = cur.lastrowid
+    photos = [name for name in saved if ext_of(name) in IMAGE_EXTS]
     for name in saved:
-        add_media(recipe_id, "image", filename=name)
-    # The first scan is the recipe picture until you replace it with a photo of the finished dish.
-    db.execute("UPDATE recipes SET cover_image=? WHERE id=?", (saved[0], recipe_id))
+        # Photos show in the gallery; PDFs and Word or text files are kept as downloadable originals.
+        add_media(recipe_id, "image" if name in photos else "document", filename=name)
+    # The first photo is the recipe picture until you replace it with a photo of the finished dish.
+    if photos:
+        db.execute("UPDATE recipes SET cover_image=? WHERE id=?", (photos[0], recipe_id))
     db.commit()
     count = len(saved)
-    flash(f"Read {count} page{'s' if count != 1 else ''}. Check the text against the scan and fix "
+    flash(f"Read {count} file{'s' if count != 1 else ''}. Check the text against the original and fix "
           "anything the reader got wrong, then save.", "ok")
     return redirect(url_for("edit_recipe", recipe_id=recipe_id))
 

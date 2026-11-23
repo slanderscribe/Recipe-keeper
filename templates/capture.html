@@ -15,8 +15,8 @@
 <form method="post" action="{{ url_for('capture') }}" enctype="multipart/form-data" class="card reveal capture-form" style="--i: 1">
   <label class="capture-drop">
     <span class="field-label">Recipe photos</span>
-    <input type="file" name="pages" accept="image/*" multiple required>
-    <span class="help">Pick one photo for a handwritten card, or several pages from a cookbook, in reading order. Up to {{ max_pages }} at a time.</span>
+    <input type="file" name="pages" accept="image/*,.pdf,.docx,.txt,.md" multiple required>
+    <span class="help">Photos, PDFs, Word (.docx) or text files. Pick several for one recipe, in reading order. Up to {{ max_pages }} files at a time.</span>
   </label>
   <button class="btn">Read recipe</button>
   <p class="help">{% if using_claude %}Reading takes about 10 to 30 seconds for a few pages. Check the text against the scan before you save.{% else %}Reading uses the free text reader, which is weak on handwriting. Check the text against the scan before you save.{% endif %}</p>
