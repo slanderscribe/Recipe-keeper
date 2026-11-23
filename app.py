@@ -177,7 +177,7 @@ def template_helpers():
 def canonical_category(raw):
     """Match a typed category to a default name regardless of case ("dessert" -> "Dessert")."""
     name = " ".join((raw or "").split())
-    known = {c.lower(): c for c in DEFAULT_CATEGORIES}
+    known = {c.lower(): c for c in DEFAULT_CATEGORIES + SUGGESTED_CATEGORIES}
     return known.get(name.lower(), name[:40])
 
 

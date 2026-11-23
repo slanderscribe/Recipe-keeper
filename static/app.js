@@ -231,9 +231,20 @@
       }
     });
 
+    // Text still in the box when you leave or save: use the highlighted match if it
+    // continues what you typed ("Holid" -> "Holiday"), otherwise use exactly what you typed.
+    function pending() {
+      const typed = input.value.trim();
+      if (!typed) return "";
+      const top = items[0];
+      if (top && !top.add && top.value.toLowerCase().indexOf(typed.toLowerCase()) === 0) return top.value;
+      return typed;
+    }
+
     input.addEventListener("blur", function () {
       setTimeout(function () {
-        if (input.value.trim()) attach(input.value);
+        const text = pending();
+        if (text) attach(text);
         input.value = "";
         hide();
       }, 150);
@@ -241,7 +252,8 @@
 
     if (form) {
       form.addEventListener("submit", function () {
-        if (input.value.trim()) attach(input.value);
+        const text = pending();
+        if (text) attach(text);
         input.value = "";
         sync();
       });
