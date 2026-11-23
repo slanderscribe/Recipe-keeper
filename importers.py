@@ -116,6 +116,10 @@ def fetch_html(url):
             if resp.status_code in (301, 302, 303, 307, 308) and resp.headers.get("Location"):
                 current = urljoin(current, resp.headers["Location"])
                 continue
+            if resp.status_code in (401, 403, 429):
+                raise ImportProblem(
+                    "That site blocks the app from reading its pages. The link is saved. Open the recipe "
+                    "in your browser and paste the ingredients and steps into the boxes below.")
             if resp.status_code >= 400:
                 raise ImportProblem(f"The site returned an error ({resp.status_code}).")
             body = bytearray()
