@@ -1,10 +1,10 @@
 {
-  "name": "Recipe Keeper",
-  "short_name": "Recipes",
+  "name": "Steele Family Recipe Vault",
+  "short_name": "Recipe Vault",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fbf4e9",
-  "theme_color": "#e0533a",
+  "theme_color": "#1f2a36",
   "icons": [
     { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml" }
   ],

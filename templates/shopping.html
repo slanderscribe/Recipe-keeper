@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Shopping list · Recipe Keeper{% endblock %}
+{% block title %}Shopping list · {{ APP_NAME }}{% endblock %}
 {% macro row(it) %}
   <li class="{{ 'done' if it.checked }}">
     <form method="post" action="{{ url_for('toggle_shopping', item_id=it.id) }}">

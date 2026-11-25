@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#e0533a">
-  <title>{% block title %}Recipe Keeper{% endblock %}</title>
+  <meta name="theme-color" content="#1f2a36">
+  <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600..800&family=Inter:wght@400..600&display=swap" rel="stylesheet">
@@ -18,7 +18,14 @@
   <div class="blob b3" aria-hidden="true"></div>
   {% set ep = request.endpoint %}
   <header class="topbar">
-    <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍳</span>Recipe Keeper</a>
+    <a class="brand" href="{{ url_for('index') }}"><svg class="vault-mark" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="22.5" fill="#1f2a36" stroke="#c9a461" stroke-width="2"/>
+      <circle cx="24" cy="24" r="15" fill="none" stroke="#c9a461" stroke-width="2.2"/>
+      <path d="M24 3.5v5M24 39.5v5M3.5 24h5M39.5 24h5M9.7 9.7l3.6 3.6M34.7 34.7l3.6 3.6M9.7 38.3l3.6-3.6M34.7 13.3l3.6-3.6" stroke="#c9a461" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="24" cy="24" r="4.5" fill="#e6c884"/>
+      <path d="M24 17.5l2.2 6.5L24 26l-2.2-2L24 17.5z" fill="#e6c884"/>
+    </svg>
+      <span class="brand-text"><small>Steele Family</small>Recipe Vault</span></a>
     <nav class="tabs" id="tabs">
       <span class="tab-indicator" aria-hidden="true"></span>
       <a class="tab {{ 'is-active' if ep in ('index', 'view_recipe', 'edit_recipe') }}" href="{{ url_for('index') }}">Recipes</a>

@@ -1,4 +1,4 @@
-"""Recipe Keeper: a family recipe box with social-post import, mixed media and a shopping list."""
+"""Steele Family Recipe Vault: a family recipe box with social-post import, mixed media and a shopping list."""
 import hashlib
 import hmac
 import io
@@ -36,6 +36,8 @@ SUGGESTED_CATEGORIES = ["Holiday", "Christmas", "Thanksgiving", "Easter", "Birth
 
 app = Flask(__name__)
 # Template check: is this ingredient line a sub-heading or a recipe part rather than something to buy?
+APP_NAME = "Steele Family Recipe Vault"
+app.jinja_env.globals["APP_NAME"] = APP_NAME
 app.jinja_env.filters["is_part"] = lambda text: parse_ingredient(text)["part"]
 app.secret_key = os.environ.get("SECRET_KEY") or hashlib.sha256(
     f"recipe-keeper:{APP_PASSWORD}".encode()).hexdigest()
@@ -386,7 +388,10 @@ def index():
         params.append(f"%,{tag},%")
     sql += " ORDER BY updated_at DESC"
     recipes = db.execute(sql, params).fetchall()
-    return render_template("index.html", recipes=recipes, q=q, tag=tag, cat=cat,
+    layout = request.args.get("view", "carousel")
+    if layout not in ("carousel", "grid"):
+        layout = "carousel"
+    return render_template("index.html", recipes=recipes, q=q, tag=tag, cat=cat, layout=layout,
                            categories=categories, total=len(all_rows), all_tags=sorted(tag_set))
 
 
@@ -473,7 +478,7 @@ def save_shared(files, values):
     if photos:
         db.execute("UPDATE recipes SET cover_image=? WHERE id=?", (photos[0], recipe_id))
     db.commit()
-    flash("Saved to Recipe Keeper. Add the ingredients and steps, then save.", "ok")
+    flash("Saved to the Steele Family Recipe Vault. Add the ingredients and steps, then save.", "ok")
     return redirect(url_for("edit_recipe", recipe_id=recipe_id))
 
 

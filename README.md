@@ -1,11 +1,11 @@
-# Recipe Keeper
+# Steele Family Recipe Vault
 
 A family recipe box. Save recipes from links (Instagram, TikTok, YouTube, Pinterest or a recipe site), keep photos and videos with each recipe, and build a shopping list from the ingredients.
 
 ## What it does
 
 - **Import from a link.** Recipe sites give a full recipe (ingredients and steps). Social posts give the title, caption and photo, and the original link is kept. The recipe photo is copied into the app, so it doesn't break if the site changes.
-- **Share from your phone (Android Chrome).** Once the app is on your home screen, use the Share menu and pick Recipe Keeper. You can share a link, or a saved video or screenshot from TikTok or Instagram. The file becomes a new recipe that you finish in Edit. iPhone can't share files into web apps, so there, upload the video through the Videos field.
+- **Share from your phone (Android Chrome).** Once the app is on your home screen, use the Share menu and pick Steele Family Recipe Vault. You can share a link, or a saved video or screenshot from TikTok or Instagram. The file becomes a new recipe that you finish in Edit. iPhone can't share files into web apps, so there, upload the video through the Videos field.
 - **Embedded posts.** YouTube, TikTok and Instagram links play inside the recipe page.
 - **Mixed media.** Each recipe can hold photos, videos and links, with a choice of cover photo.
 - **Shopping list.** Tick ingredients on a recipe and add them. Duplicates are skipped. Tick items off in the store.

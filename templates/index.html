@@ -1,41 +1,6 @@
 {% extends "base.html" %}
-{% block content %}
-<section class="hero reveal" style="--i: 0">
-  <p class="eyebrow">Our family cookbook · {{ total }} recipe{{ '' if total == 1 else 's' }}</p>
-  <h1>What are we <em>cooking</em> today?</h1>
-  <form method="get" action="{{ url_for('index') }}" class="search-wrap" autocomplete="off">
-    <div class="search">
-      <input type="search" name="q" value="{{ q }}" placeholder="Search recipes, categories or ingredients"
-             data-suggest="{{ url_for('suggest') }}" data-box="suggest-box" aria-label="Search recipes">
-      {% if cat %}<input type="hidden" name="cat" value="{{ cat }}">{% endif %}
-      {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
-      <button class="btn">Search</button>
-    </div>
-    <ul class="suggest" id="suggest-box" role="listbox" hidden></ul>
-  </form>
-</section>
-
-<nav class="tabs cat-tabs reveal" style="--i: 1" aria-label="Categories">
-  <span class="tab-indicator" aria-hidden="true"></span>
-  <a class="tab {{ 'is-active' if not cat }}" href="{{ url_for('index', q=q, tag=tag) }}">All <span class="count">{{ total }}</span></a>
-  {% for c in categories %}
-    <a class="tab {{ 'is-active' if cat == c.name }} {{ 'empty-cat' if not c.n }}"
-       href="{{ url_for('index', cat=c.name, q=q, tag=tag) }}">{{ c.name }} <span class="count">{{ c.n }}</span></a>
-  {% endfor %}
-</nav>
-
-{% if all_tags and not cat %}
-<div class="tag-row reveal" style="--i: 2">
-  {% for t in all_tags[:14] %}
-    <a class="chip {{ 'active' if t == tag }}" href="{{ url_for('index', tag=t, q=q) }}">#{{ t }}</a>
-  {% endfor %}
-</div>
-{% endif %}
-
-{% if recipes %}
-<div class="grid" style="margin-top: 1.25rem">
-  {% for r in recipes %}
-  <a class="card recipe-card reveal" style="--i: {{ loop.index0 }}" href="{{ url_for('view_recipe', recipe_id=r.id) }}">
+{% macro recipe_card(r, i) %}
+  <a class="card recipe-card reveal" style="--i: {{ i }}" href="{{ url_for('view_recipe', recipe_id=r.id) }}">
     {% set cov = cover_url(r.cover_image) %}
     <div class="cover">
       {% if cov %}
@@ -57,8 +22,68 @@
       {% endif %}
     </div>
   </a>
+{% endmacro %}
+{% block content %}
+<section class="hero reveal" style="--i: 0">
+  <p class="eyebrow">The Steele family cookbook · {{ total }} recipe{{ '' if total == 1 else 's' }}</p>
+  <h1>What are we <em>cooking</em> today?</h1>
+  <form method="get" action="{{ url_for('index') }}" class="search-wrap" autocomplete="off">
+    <div class="search">
+      <input type="search" name="q" value="{{ q }}" placeholder="Search recipes, categories or ingredients"
+             data-suggest="{{ url_for('suggest') }}" data-box="suggest-box" aria-label="Search recipes">
+      {% if cat %}<input type="hidden" name="cat" value="{{ cat }}">{% endif %}
+      {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+      {% if layout == 'grid' %}<input type="hidden" name="view" value="grid">{% endif %}
+      <button class="btn">Search</button>
+    </div>
+    <ul class="suggest" id="suggest-box" role="listbox" hidden></ul>
+  </form>
+</section>
+
+<nav class="tabs cat-tabs reveal" style="--i: 1" aria-label="Categories">
+  <span class="tab-indicator" aria-hidden="true"></span>
+  <a class="tab {{ 'is-active' if not cat }}" href="{{ url_for('index', q=q, tag=tag, view=layout) }}">All <span class="count">{{ total }}</span></a>
+  {% for c in categories %}
+    <a class="tab {{ 'is-active' if cat == c.name }} {{ 'empty-cat' if not c.n }}"
+       href="{{ url_for('index', cat=c.name, q=q, tag=tag, view=layout) }}">{{ c.name }} <span class="count">{{ c.n }}</span></a>
+  {% endfor %}
+</nav>
+
+{% if all_tags and not cat %}
+<div class="tag-row reveal" style="--i: 2">
+  {% for t in all_tags[:14] %}
+    <a class="chip {{ 'active' if t == tag }}" href="{{ url_for('index', tag=t, q=q, view=layout) }}">#{{ t }}</a>
   {% endfor %}
 </div>
+{% endif %}
+
+{% if recipes %}
+<div class="view-toggle reveal" style="--i: 2" role="group" aria-label="Recipe layout">
+  <a class="{{ 'is-on' if layout == 'carousel' }}" href="{{ url_for('index', q=q, cat=cat, tag=tag, view='carousel') }}">Carousel</a>
+  <a class="{{ 'is-on' if layout == 'grid' }}" href="{{ url_for('index', q=q, cat=cat, tag=tag, view='grid') }}">Grid</a>
+</div>
+
+{% if layout == 'grid' %}
+<div class="grid">
+  {% for r in recipes %}{{ recipe_card(r, loop.index0) }}{% endfor %}
+</div>
+{% else %}
+<div class="shelf reveal" style="--i: 3">
+  <button type="button" class="shelf-btn prev" data-shelf-prev aria-label="Scroll back">‹</button>
+  <div class="shelf-track" role="list">
+    {% for r in recipes %}<div role="listitem">{{ recipe_card(r, loop.index0) }}</div>{% endfor %}
+  </div>
+  <button type="button" class="shelf-btn next" data-shelf-next aria-label="Scroll forward">›</button>
+</div>
+<script>
+  document.querySelectorAll('.shelf').forEach(function (shelf) {
+    var track = shelf.querySelector('.shelf-track');
+    function step(dir) { track.scrollBy({ left: dir * track.clientWidth * 0.8, behavior: 'smooth' }); }
+    shelf.querySelector('[data-shelf-prev]').addEventListener('click', function () { step(-1); });
+    shelf.querySelector('[data-shelf-next]').addEventListener('click', function () { step(1); });
+  });
+</script>
+{% endif %}
 {% else %}
 <div class="card empty reveal" style="--i: 0; margin-top: 1.25rem">
   <h2>{{ 'Nothing in this category yet.' if cat else ('Nothing matches that.' if q or tag else 'Your recipe box is empty.') }}</h2>
