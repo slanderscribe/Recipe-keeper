@@ -21,13 +21,7 @@
       {% endfor %}
     {% endwith %}
     <form method="post" class="login-card reveal" style="--i: 0">
-      <div class="login-mark"><svg class="vault-mark" viewBox="0 0 48 48" aria-hidden="true">
-          <circle cx="24" cy="24" r="22.5" fill="#1f2a36" stroke="#c9a461" stroke-width="2"/>
-          <circle cx="24" cy="24" r="15" fill="none" stroke="#c9a461" stroke-width="2.2"/>
-          <path d="M24 3.5v5M24 39.5v5M3.5 24h5M39.5 24h5M9.7 9.7l3.6 3.6M34.7 34.7l3.6 3.6M9.7 38.3l3.6-3.6M34.7 13.3l3.6-3.6" stroke="#c9a461" stroke-width="2.2" stroke-linecap="round"/>
-          <circle cx="24" cy="24" r="4.5" fill="#e6c884"/>
-          <path d="M24 17.5l2.2 6.5L24 26l-2.2-2L24 17.5z" fill="#e6c884"/>
-        </svg></div>
+      <div class="login-mark"><img src="{{ url_for('static', filename='icon-192.png') }}?v=3" alt=""></div>
       <h1 class="display">{{ APP_NAME }}</h1>
       <p class="muted">Our family's recipes, kept safe</p>
       <label>Family password

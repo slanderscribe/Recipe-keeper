@@ -89,7 +89,7 @@ h3 { font-size: 1.15rem; }
   font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 1.2rem;
   color: #f6ecd6; text-decoration: none;
 }
-.vault-mark { width: 42px; height: 42px; flex: none; transition: transform .7s var(--ease); }
+.vault-mark { width: 44px; height: 44px; flex: none; border-radius: 12px; box-shadow: 0 4px 12px -4px rgba(0,0,0,.5); transition: transform .7s var(--ease); }
 .brand:hover .vault-mark { transform: rotate(90deg); }
 .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
 .brand-text small {
@@ -168,7 +168,11 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
 .chip.active { background: var(--olive); border-color: var(--olive); color: #fff; }
 
 /* cards and grid */
-.grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 42vw, 250px), 1fr)); }
+.grid .recipe-card .body { padding: .7rem .8rem .85rem; }
+.grid .recipe-card h3 { font-size: 1rem; }
+.grid .recipe-card .meta, .grid .recipe-card .tags { font-size: .8rem; }
+.grid .recipe-card .cover span { font-size: 2.2rem; }
 .card {
   background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 1.2rem 1.3rem; margin-bottom: 1rem;
@@ -477,16 +481,26 @@ input[type="file"] { font-weight: 400; }
 .view-toggle a.is-on { background: var(--steel); color: var(--brass-light); }
 .shelf { position: relative; margin: .4rem -1.25rem 0; }
 .shelf-track {
-  display: flex; gap: 1.2rem; overflow-x: auto; scroll-snap-type: x mandatory;
-  padding: .8rem 1.25rem 1.6rem; scroll-padding: 0 1.25rem;
+  display: flex; gap: 1.1rem; overflow-x: auto; overscroll-behavior-x: contain;
+  padding: .8rem 1.25rem 1.6rem;
   scrollbar-width: thin; scrollbar-color: var(--brass) transparent;
 }
-.shelf-track > div { flex: 0 0 min(72vw, 270px); scroll-snap-align: start; }
+.shelf-track > div { flex: 0 0 min(64vw, 240px); }
+@supports (animation-timeline: view()) {
+  .shelf-track > div {
+    animation: shelf-in linear both; animation-timeline: view(inline);
+    animation-range: entry 0% cover 35%;
+  }
+}
+@keyframes shelf-in {
+  from { opacity: .35; transform: scale(.88) translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
 .shelf-track .recipe-card { height: 100%; }
-.shelf-track .cover { aspect-ratio: 3 / 4; }
+.shelf-track .cover { aspect-ratio: 4 / 5; }
 .shelf-track .recipe-card h3 { font-size: 1.2rem; }
 @media (min-width: 900px) {
-  .shelf-track > div { flex-basis: 300px; }
+  .shelf-track > div { flex-basis: 280px; }
 }
 .shelf-btn {
   display: none; position: absolute; top: 40%; z-index: 5;
@@ -501,6 +515,18 @@ input[type="file"] { font-weight: 400; }
 }
 @media (max-width: 640px) {
   .shelf { margin: .4rem -.9rem 0; }
-  .shelf-track { padding-left: .9rem; padding-right: .9rem; scroll-padding: 0 .9rem; }
+  .shelf-track { padding-left: .9rem; padding-right: .9rem; }
   .login-mark { width: 64px; height: 64px; }
+}
+
+/* bottom of every page: steel band with brass rule, matching the header */
+.vault-foot {
+  display: flex; flex-direction: column; align-items: center; gap: .15rem;
+  padding: 1.4rem 1rem calc(1.4rem + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, var(--steel), #121a23);
+  border-top: 2px solid var(--brass); color: #cdbb93; font-size: .88rem; text-align: center;
+}
+.vault-foot-name {
+  font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 1.05rem; color: var(--brass-light);
+  letter-spacing: .02em;
 }
