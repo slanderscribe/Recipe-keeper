@@ -336,6 +336,14 @@ def split_categories(value):
     return [part.strip() for part in (value or "").split(",") if part.strip()]
 
 
+def matches_words(row, query):
+    """Every word typed must start a word in the recipe: 'break' finds 'Breakfast', never 'oatbreakfast'."""
+    haystack = " ".join(str(row[k] or "") for k in
+                        ("title", "description", "ingredients", "tags", "source_author", "category"))
+    words = re.split(r"[^a-z0-9]+", haystack.lower())
+    return all(any(w.startswith(term) for w in words if w) for term in re.split(r"[^a-z0-9]+", query.lower()) if term)
+
+
 def all_category_names():
     """Every category name in use, keyed by lowercase, with default names first."""
     names = {c.lower(): c for c in DEFAULT_CATEGORIES}
@@ -374,10 +382,6 @@ def index():
 
     sql = "SELECT * FROM recipes WHERE 1=1"
     params = []
-    if q:
-        sql += (" AND (title LIKE ? OR description LIKE ? OR ingredients LIKE ?"
-                " OR tags LIKE ? OR source_author LIKE ? OR category LIKE ?)")
-        params += [f"%{q}%"] * 6
     if cat == UNCATEGORIZED:
         sql += " AND TRIM(category) = ''"
     elif cat:
@@ -388,6 +392,8 @@ def index():
         params.append(f"%,{tag},%")
     sql += " ORDER BY updated_at DESC"
     recipes = db.execute(sql, params).fetchall()
+    if q:
+        recipes = [r for r in recipes if matches_words(r, q)]
     layout = request.args.get("view", "carousel")
     if layout not in ("carousel", "grid"):
         layout = "carousel"
@@ -414,7 +420,8 @@ def suggest():
     for name in DEFAULT_CATEGORIES + SUGGESTED_CATEGORIES:
         pool.setdefault(name.lower(), name)
     for row in db.execute("SELECT category, tags, title, source_author FROM recipes").fetchall():
-        candidates = [row["category"], row["title"], row["source_author"]]
+        # Each category on its own, so "Breakfast,Snacks" offers "Breakfast" and "Snacks".
+        candidates = split_categories(row["category"]) + [row["title"], row["source_author"]]
         candidates += [t.replace("-", " ") for t in row["tags"].split(",") if t]
         for value in candidates:
             value = (value or "").strip()
@@ -423,12 +430,11 @@ def suggest():
     scored = []
     for low, shown in pool.items():
         words = [w for w in re.split(r"[\s\-,&/]+", low) if w]
+        # Only whole words count: "break" matches "Breakfast" and "Breakfast burritos", not "Oatbreakfast".
         if low.startswith(q):
             score = 0
         elif any(w.startswith(q) for w in words):
             score = 1
-        elif q in low:
-            score = 2
         else:
             continue
         scored.append((score, low, shown))
